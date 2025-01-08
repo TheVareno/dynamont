@@ -6,9 +6,10 @@ github: https://github.com/TheVareno
 """
  
 from read5.Reader import read # type: ignore 
-import ont_fast5_api   # type: ignore 
+# import ont_fast5_api   # type: ignore 
 from ont_fast5_api.conversion_tools.fast5_subset import Fast5Filter   # type: ignore 
 import argparse
+# TODO use hampelFilter from FileIO.py
 from hampel import hampel # type: ignore
 import subprocess as sp
 import os  
@@ -130,7 +131,7 @@ def split_segment_input(input_read_data: str, output_path: str, summary_file_pat
 
 
 def main(): 
-    
+    # TODO use same parameters/namings as dynamont
     parser = argparse.ArgumentParser(description="Process and Save output file.")
     parser.add_argument('-i', "--fast5_path", type=str, required=True, help="Path to input ONT read data in FAST5, POD5, or SLOW5 format.")
     parser.add_argument('-o', "--output_dir", type=str, required=True, help="Directory to save output files.")
