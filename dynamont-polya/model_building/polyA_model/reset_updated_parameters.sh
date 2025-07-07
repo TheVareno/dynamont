@@ -1,0 +1,3 @@
+
+# reset the using parmater 
+echo 'S: 0.1; L1: 0.9; L2: 0.9; A1: 0.1; A2: 0.95; PA1: 0.05; PA2: 0.9; TR1: 0.1; TR2: 1.0' > updated_parameters.txt

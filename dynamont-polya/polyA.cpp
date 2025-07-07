@@ -1,6 +1,6 @@
-// author: Jannes Spangenberg
-// e-mail: jannes.spangenberg@uni-jena.de
-// github: https://github.com/JannesSP
+// author: Jannes Spangenberg & Hadi Vareno 
+// e-mail: jannes.spangenberg@uni-jena.de & hadivareno@gmail.com
+// github: https://github.com/JannesSP & https://github.com/TheVareno
 // website: https://jannessp.github.io
 
 #include <iostream>
