@@ -17,7 +17,7 @@ from src.python.segmentation.FileIO import hampelFilter
 def parse() -> Namespace:
     parser = ArgumentParser(
         formatter_class=ArgumentDefaultsHelpFormatter
-    )
+    )   
     parser.add_argument("-r", "--raw", type=str, required=True, metavar="FAST5|POD5", help="Input raw file format (FAST5, POD5)")
     parser.add_argument("-b", "--basecalls", type=str, required=True, metavar="BAM", help="Basecalls of ONT training data as.bam file")
     parser.add_argument("-o", "--output", type=str, required=True, metavar="HDF5", help="Output HDF5 file")

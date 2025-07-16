@@ -1,4 +1,5 @@
 
+
 """
 author: Hadi Vareno
 e-mail: mohammad.noori.vareno@uni-jena.de
@@ -6,8 +7,8 @@ github: https://github.com/TheVareno
 """
  
 from read5.Reader import read # type: ignore 
-# import ont_fast5_api   # type: ignore 
-from ont_fast5_api.conversion_tools.fast5_subset import Fast5Filter   # type: ignore 
+from ont_fast5_api.conversion_tools.fast5_subset import Fast5Filter # type: ignore 
+# import ont_fast5_api # type: ignore 
 import argparse
 # TODO use hampelFilter from FileIO.py
 from hampel import hampel # type: ignore

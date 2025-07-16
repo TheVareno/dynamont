@@ -3,7 +3,7 @@
 // github: https://github.com/JannesSP
 // website: https://jannessp.github.io
 
-#include "dynamont_NT.hpp"
+#include "../../include/dynamont_NT.hpp"
 
 bool rna;
 std::unordered_map<std::string, double> transitions_NT = {
