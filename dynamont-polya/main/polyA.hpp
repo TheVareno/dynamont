@@ -45,23 +45,23 @@ inline constexpr double t_df_adapter = 5.612094;
  * @param signal_value 
  * @return probability of signal value emitted by t distribution PDF
 */
-inline double log_t_pdf_polyA(const double signal_value)
+inline double log_t_polyA(const double signal_value)
 {
     const double diff = (signal_value - t_loc_polyA) / t_scale_polyA;
     const double logGammaNuPlusOneHalf = lgamma((t_df_polyA + 1.0) / 2.0);
     const double logGammaNuHalf = lgamma(t_df_polyA / 2.0);
 
-    return logGammaNuPlusOneHalf - logGammaNuHalf - 0.5 * log(t_df_polyA * pi * t_scale_polyA * t_scale_polyA) - (t_df_polyA + 1.0) / 2.0 * log(1.0 + (diff * diff) / t_df-polyA);
+    return logGammaNuPlusOneHalf - logGammaNuHalf - 0.5 * log(t_df_polyA * pi * t_scale_polyA * t_scale_polyA) - (t_df_polyA + 1.0) / 2.0 * log(1.0 + (diff * diff) / t_df_polyA);
 } 
 
 
-inline double log_t_pdf_adapter(const double signal_value)
+inline double log_t_adapter(const double signal_value)
 {
     const double diff = (signal_value - t_loc_adapter) / t_scale_adapter;
     const double logGammaNuPlusOneHalf = lgamma((t_df_adapter + 1.0) / 2.0);
     const double logGammaNuHalf = lgamma(t_df_adapter / 2.0);
 
-    return logGammaNuPlusOneHalf - logGammaNuHalf - 0.5 * log(t_df * pi * t_scale_adapter * t_scale_adapter) - (t_df_adapter + 1.0) / 2.0 * log(1.0 + (diff * diff) / t_df_adapter);
+    return logGammaNuPlusOneHalf - logGammaNuHalf - 0.5 * log(t_df_adapter * pi * t_scale_adapter * t_scale_adapter) - (t_df_adapter + 1.0) / 2.0 * log(1.0 + (diff * diff) / t_df_adapter);
 } 
 
 // logarithm gumbel left skewed PDF : checked the correctness with scipy.stats.gumbel_l
@@ -144,22 +144,19 @@ inline void logF(double *sig, double *S, double *L, double *A, double *PA, doubl
         polya = -INFINITY;
         transcript = -INFINITY;
 
-        // calculate probabilities:
-        //       accumulator + (prevV *                 emission                * transition)
-        S[t] = logPlus(S[t - 1], EMIT(S[t - 1] + log_gumbel_r_start(sig[t - 1]) + s));
+        S[t] = logPlus(S[t - 1], EMIT(S[t - 1], log_gumbel_r_start, sig[t - 1], s));
 
-        L[t] = logPlus(S[t - 1], EMIT(S[t - 1] + log_gumbel_l_leader(sig[t - 1]) + l1));
-        L[t] = logPlus(L[t - 1], EMIT(L[t - 1] + log_gumbel_l_leader(sig[t - 1]) + l2));
+        L[t] = logPlus(S[t - 1], EMIT(S[t - 1], log_gumbel_l_leader, sig[t - 1], l1));
+        L[t] = logPlus(L[t - 1], EMIT(L[t - 1], log_gumbel_l_leader, sig[t - 1], l2));
 
-        A[t] = logPlus(L[t - 1], EMIT(L[t - 1] + log_t_pdf_adapter(sig[t - 1]) + a1));
-        A[t] = logPlus(A[t - 1], EMIT(A[t - 1] + log_t_pdf_adapter(sig[t - 1]) + a2));
+        A[t] = logPlus(L[t - 1], EMIT(L[t - 1], log_t_adapter, sig[t - 1], a1));
+        A[t] = logPlus(A[t - 1], EMIT(A[t - 1], log_t_adapter, sig[t - 1], a2));
 
-        PA[t] = logPlus(A[t - 1], EMIT(A[t - 1] + log_t_pdf_polyA(sig[t - 1]) + pa1));
-        PA[t] = logPlus(PA[t - 1], EMIT(PA[t - 1] + log_t_pdf_polyA(sig[t - 1]) + pa2));
+        PA[t] = logPlus(A[t - 1], EMIT(A[t - 1], log_t_polyA, sig[t - 1], pa1));
+        PA[t] = logPlus(PA[t - 1], EMIT(PA[t - 1], log_t_polyA, sig[t - 1], pa2));
 
-        TR[t] = logPlus(PA[t - 1], EMIT(PA[t - 1] + log_gumbel_r_transcript(sig[t - 1]) + tr1));
-        TR[t] = logPlus(TR[t - 1], EMIT(TR[t - 1] + log_gumbel_r_transcript(sig[t - 1]) + tr2));
-
+        TR[t] = logPlus(PA[t - 1], EMIT(PA[t - 1], log_gumbel_r_transcript, sig[t - 1], tr1));
+        TR[t] = logPlus(TR[t - 1], EMIT(TR[t - 1], log_gumbel_r_transcript, sig[t - 1], tr2));
     } 
 
 }
@@ -184,21 +181,19 @@ inline void logB(double *sig, double *S, double *L, double *A, double *PA, doubl
         polya = -INFINITY;
         transcript = -INFINITY;
 
-        // calculate probabilities
-        //       accumulator + (prevV *         emission(t)                   * transition)
-        S[t] = logPlus(S[t + 1], EMIT(S[t + 1] + log_gumbel_r_pdf(sig[t]) + s));
-        S[t] = logPlus(S[t + 1], EMIT(L[t + 1] + log_gumbel_l_pdf(sig[t]) + l1));
+        S[t] = logPlus(S[t + 1], EMIT(S[t + 1], log_gumbel_r_start, sig[t], s));
+        S[t] = logPlus(S[t + 1], EMIT(L[t + 1], log_gumbel_l_leader, sig[t], l1));
 
-        L[t] = logPlus(L[t + 1], EMIT(L[t + 1] + log_gumbel_l_leader(sig[t]) + l2));
-        L[t] = logPlus(L[t + 1], EMIT(A[t + 1] + log_t_pdf_adapter(sig[t]) + a1));
+        L[t] = logPlus(L[t + 1], EMIT(L[t + 1], log_gumbel_l_leader, sig[t], l2));
+        L[t] = logPlus(L[t + 1], EMIT(A[t + 1], log_t_adapter, sig[t], a1));
 
-        A[t] = logPlus(A[t + 1], EMIT(A[t + 1] + log_t_pdf_adapter(sig[t]) + a2));
-        A[t] = logPlus(A[t + 1], EMIT(PA[t + 1] + log_t_pdf_polyA(sig[t]) + pa1));
+        A[t] = logPlus(A[t + 1], EMIT(A[t + 1], log_t_adapter, sig[t], a2));
+        A[t] = logPlus(A[t + 1], EMIT(PA[t + 1], log_t_polyA, sig[t], pa1));
 
-        PA[t] = logPlus(PA[t + 1], EMIT(PA[t + 1] + log_t_pdf_polyA(sig[t]) + pa2));
-        PA[t] = logPlus(PA[t + 1], EMIT(TR[t + 1] + log_gumbel_r_transcript(sig[t]) + tr1));
+        PA[t] = logPlus(PA[t + 1], EMIT(PA[t + 1], log_t_polyA, sig[t], pa2));
+        PA[t] = logPlus(PA[t + 1], EMIT(TR[t + 1], log_gumbel_r_transcript, sig[t], tr1));
 
-        TR[t] = logPlus(TR[t + 1], EMIT(TR[t + 1] + log_gumbel_r_transcript(sig[t]) + tr2));        
+        TR[t] = logPlus(TR[t + 1], EMIT(TR[t + 1], log_gumbel_r_transcript, sig[t], tr2));        
     }
 }
 
@@ -226,9 +221,28 @@ inline double *logP(const double *F, const double *B, const double Z, const size
  * define backtracing function after each state
 */
 
+// define the functions due to circular calls 
+inline void funcS(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
+           const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
+           list<string> &segString, vector<size_t> &borders, string prevState); 
+
+inline void funcL(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
+           const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
+           list<string> &segString, vector<size_t> &borders, string prevState); 
+
+inline void funcA(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
+           const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
+           list<string> &segString, vector<size_t> &borders, string prevState); 
+
+inline void funcPA(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
+            const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
+            list<string> &segString, vector<size_t> &borders, string prevState); 
+
+inline void funcTR(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
+            const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
+            list<string> &segString, vector<size_t> &borders, string prevState);
+
 // Backtracking Funcs Declaration
-
-
 inline void funcS(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
            const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
            list<string> &segString, vector<size_t> &borders, string prevState) 
@@ -259,7 +273,6 @@ inline void funcS(const size_t t, const double *S, const double *L, const double
     }
 }
 
-
 inline void funcL(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
            const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
            list<string> &segString, vector<size_t> &borders, string prevState)
@@ -281,7 +294,6 @@ inline void funcL(const size_t t, const double *S, const double *L, const double
         funcL(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
     }
 }
-
 
 inline void funcA(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
            const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
@@ -421,22 +433,27 @@ inline string getBorders(const double *LPS, const double *LPL, const double *LPA
 }
 
 
+inline void esitmate_length()
+{
+    // read the sequecning_summary 
+}
+
+
+template <typename T>
 inline void writeBorders(const string &save_file, const string &read_id, const vector<T> &borders)
 {
-
     ofstream output_file(save_file, ios::app);
 
     if (!output_file.is_open())
     {
-        cerr << "Error: Unable to open file";
+        std::cerr << "Error: Unable to open file";
         exit(EXIT_FAILURE);
     }
 
     output_file << read_id << ",";
 
-    for (size_t i = 0; i < borders.size(); ++i)
+    for (std::size_t i = 0; i < borders.size(); ++i)
     {
-
         output_file << borders[i];
 
         if (i < borders.size() - 1)

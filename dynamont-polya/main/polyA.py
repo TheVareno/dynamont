@@ -13,15 +13,15 @@ import argparse
 # TODO use hampelFilter from FileIO.py
 from hampel import hampel # type: ignore
 import subprocess as sp
-import multiprocessing as mp 
-from pathlib import Path
-from typing import List
+import multiprocessing as mp
 import queue
 import os   
+from typing import List
+from pathlib import Path
 
-def get_read_data(input_path: str) -> List[Path]:
+def get_read_data(input_path: str) -> any:
     
-    allowed_extensions = {'.fast5', '.pod5', '.slow5'}
+    allowed_extensions = {'fast5', 'pod5', 'slow5'}
 
     if os.path.isfile(input_path):
         extention = input_path.split('.')[1]  
@@ -29,81 +29,110 @@ def get_read_data(input_path: str) -> List[Path]:
             return input_path
         else: 
             raise ValueError(f"Given file format not acceptable, allowd formats: FAST5, POD5 or SLOW5")
-    
-    
+        
     if os.path.isdir(input_path):
-        input_dir = Path(input_path)
+        res_files = []
+        for file_path in os.listdir(input_path): 
+            if os.path.isfile(os.path.join(input_path, file_path)): 
+                extention = os.path.join(input_path, file_path).split('.')[1] 
+                if extention in allowed_extensions: 
+                    res_files.append(file_path)
+                
+                else:
+                    raise ValueError(
+                    f"Working directory does not contain any FAST5, POD5, or SLOW5 read data files.")
 
-        found_files = [
-            file_path for file_path in input_path.iterdir()
-            if file_path.is_file() and file_path.suffix.lower() in allowed_extensions
-        ]
-
-        if not found_files:
-            raise ValueError(
-                f"Working directory '{input_dir}' does not contain any "
-                "FAST5, POD5, or SLOW5 read data files."
-            )
-
-        return found_files
+        return res_files
     
 
-def find_polya(task_queue: mp.Queue, result_queue: mp.Queue, read_object: str): 
-    
-    while not task_queue.empty(): 
+def find_polya(task_queue: mp.Queue, result_queue: mp.Queue, input_file: str): 
+
+    read_object = read(input_file)
+
+    while True:
         try:
             read_id = task_queue.get_nowait() 
+ 
             z_normalized_signal_values = read_object.getZNormSignal(read_id, mode='mean')
             filter_object = hampel(z_normalized_signal_values, window_size=5, n_sigma=6.0)
             filtered_signal_values = filter_object.filtered_data
 
             if len(filtered_signal_values) == 0:
-                print(f"Array of signal values empty for read id : {read_id}")
-                
-            polyA_app_call = './polyA'  
+                print(f"[WARN] Empty filtered signal for read: {read_id}")
+                continue
             
             sig_vals_str = ','.join(map(str, filtered_signal_values))
             
-            process = sp.Popen(polyA_app_call, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, text=True)
-            
             if not sig_vals_str: 
-                print(f"Empty signal values for read {read_id}")
+                print(f"[WARN] Empty signal values for read {read_id}")
             
+            process = sp.Popen('./polyA', stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, text=True)
             process.stdin.write(f"{sig_vals_str}\n")
             process.stdin.flush()
             stdout, stderr = process.communicate()
-            rc = process.returncode # returns int 
+            rc = process.returncode # int 
             
             if rc == 0:  
-                borders = stdout.strip()
-                result_queue.put((read_id, borders))
+                result_queue.put((read_id, stdout.strip()))
             else: 
-                pass
-            
+                print(f"[ERROR] polyA finder exited with code {rc} for read {read_id}")
+
             if stderr: 
-                print(f"Error for {read_id}: {stderr}")
-                continue
+                print(f"[STDERR] Error for {read_id}: {stderr}")
 
         except queue.Empty:
             break
 
 
-"""
-- raw signal splitting into 8 files of 500 reads 
-"""
-def split_segment_input(input_read_data: str, output_path: str, summary_file_path: str):
 
-    name_read_data = input_read_data.split()[0]
-        
+def start_finder(input_file, output_path, num_workers=4):
+    
     if not os.path.exists(output_path):  
         os.makedirs(output_path) 
     
-    save_file = os.path.join(output_path, f'output_{name_read_data}.csv')
+    save_file = os.path.join(output_path, f'output_test.csv')
 
     with open(save_file, 'w') as f: # file exist. check 
         f.write("Read ID, poly(A) end, adapter end, leader end, start end\n")
     
-    # alternative - file handling 
+    task_queue = mp.Queue()
+    result_queue = mp.Queue()
+
+    read_object = read(input_file)         
+    all_read_ids = read_object.getReads() 
+
+    for r_id in all_read_ids:
+        task_queue.put(r_id)
+
+    processes = []
+    for _ in range(num_workers):
+        p = mp.Process(target=find_polya, args=(task_queue, result_queue, input_file))
+        p.start()
+        processes.append(p)
+
+    for p in processes:
+        p.join()
+
+    results = []
+    while not result_queue.empty():
+        results.append(result_queue.get())
+
+    return results
+
+
+
+def split_segment_input(input_read_data: str, output_path: str, summary_file_path: str):
+
+    #name_read_data = input_read_data.split()[0]
+        
+    if not os.path.exists(output_path):  
+        os.makedirs(output_path) 
+    
+    save_file = os.path.join(output_path, f'output_test.csv')
+
+    with open(save_file, 'w') as f: # file exist. check 
+        f.write("Read ID, poly(A) end, adapter end, leader end, start end\n")
+    
     """
     with open(save_file, 'w') as f: # file exist. check 
         f.write("Read ID, poly(A) start, poly(A) end, poly(A) estimated length \n")
@@ -134,7 +163,7 @@ def split_segment_input(input_read_data: str, output_path: str, summary_file_pat
             
             task_queue = mp.Queue()
             result_queue = mp.Queue()
-    
+
             for read_id in all_read_ids:
                 task_queue.put(read_id)
     
@@ -159,34 +188,45 @@ def split_segment_input(input_read_data: str, output_path: str, summary_file_pat
 
 
 def main(): 
-    # TODO use same parameters/namings as dynamont 
 
     parser = argparse.ArgumentParser(description="Process and Save output file.")
-    parser.add_argument('-i', "--input_dir", type=str, required=True, help="Path to directory containing input ONT read data in FAST5, POD5, or SLOW5 format.")
-    parser.add_argument('-o', "--output_dir", type=str, required=False, help="Directory to save output files.")
-    parser.add_argument('-s', "--summary_file", type=str, required=False, help="Path to the sequence summary file.")
-    parser.add_argument('-t', "--test", type=str)
-
+    parser.add_argument('-i', "--input_dir", 
+                        type=str, required=True, 
+                        help="Path to directory containing input ONT read data in FAST5, POD5, or SLOW5 format.")
+    
+    parser.add_argument('-o', "--output_dir", 
+                        type=str, required=True, 
+                        help="Directory to save output files.")
+    
+    parser.add_argument('-s', "--summary_file", 
+                        type=str, required=False, 
+                        help="Path to the sequence summary file.")
+    
     args = parser.parse_args()
 
-     
-    try:
-        read_data_files : List[Path] = get_read_data(args.input_dir) # list obj: contains all reads 
-        
-        for read_data_file in read_data_files: 
+    input_path = get_read_data(args.input_dir)
+
+    if isinstance(input_path, str): 
+        start_finder(input_path, args.output_dir) 
+    else:  
+        for read_file in input_path: 
+            start_finder(read_file, args.output_dir) 
             
-            # print(read_data_file) 
-            split_segment_input(input_read_data=read_data_file, output_path=args.output_dir, summary_file_path=args.summary_file)
 
 
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
-        print("Please ensure the directory exists and the path is correct.")
-    except ValueError as e:
-        print(f"Error: {e}")
-        print("Please ensure the directory contains .fast5, .pod5, or .slow5 files.")
-    except Exception as e: 
-        print(f"An unexpected error occurred: {e}")
+    #try:
+        # read_data_files = get_read_data(args.input_dir)  
+        
+        #for read_file in read_data_files:
+
+    #except FileNotFoundError as e:
+    #    print(f"Error: {e}")
+    #    print("Please ensure the directory exists and the path is correct.")
+    #except ValueError as e:
+    #    print(f"Error: {e}")
+    #    print("Please ensure the directory contains .fast5, .pod5, or .slow5 files.")
+    #except Exception as e: 
+    #    print(f"An unexpected error occurred: {e}")
 
 
     
@@ -201,3 +241,8 @@ if __name__ == '__main__' :
 
 
 
+"""
+with open(save_file, 'w') as f: # file exist. check 
+    f.write("Read ID, poly(A) start, poly(A) end, poly(A) estimated length \n")
+"""
+    
