@@ -28,10 +28,8 @@
 int main()
 {
 
-    cout << fixed << showpoint;
-    cout << setprecision(20);
-
-    // TODO use argparse, see dynamont! 
+    std::cout << fixed << showpoint;
+    std::cout << setprecision(20);
 
     // transition parameters :
     double s = log(0.996943171897388);
@@ -48,12 +46,10 @@ int main()
 
     getline(cin, signal_values);
 
-    // due to buffer error while piping
     if (signal_values.empty())
     {
-        // cerr << "no signal value are provided!";
-        printf("Error: no signal value provided.");
-        return 1; // non-zero value to indicate something is wrong!
+        std::cerr << "[ERROR]: no signal value provided.";
+        return 1; 
     }
 
     // PROCESS SIGNAL : convert string to double array
@@ -117,10 +113,10 @@ int main()
     const double *LPTR = logP(forTR, backTR, Zf, T);
 
     string borders = getBorders(LPS, LPL, LPA, LPPA, LPTR, T);
-
+    
     if (borders.empty())
     {
-        printf("segmentation failed!");
+        std::cerr << "[ERROR] segmentation failed - borders are empty!";
         // always clean up before return
         delete[] LPS;
         delete[] LPL;

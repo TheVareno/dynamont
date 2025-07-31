@@ -14,9 +14,6 @@
 #include <numeric> //iota
 
 
-
-
-
 // ========= PROBABILITY DENSITY FUNCTIONS ===========
 
 /**

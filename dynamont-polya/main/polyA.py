@@ -56,36 +56,42 @@ def find_polya(task_queue: mp.Queue, result_queue: mp.Queue, input_file: str):
             z_normalized_signal_values = read_object.getZNormSignal(read_id, mode='mean')
             filter_object = hampel(z_normalized_signal_values, window_size=5, n_sigma=6.0)
             filtered_signal_values = filter_object.filtered_data
-
+            
             if len(filtered_signal_values) == 0:
                 print(f"[WARN] Empty filtered signal for read: {read_id}")
                 continue
             
             sig_vals_str = ','.join(map(str, filtered_signal_values))
             
+            with open('signal.txt', 'w') as f:
+                f.write(sig_vals_str)
+
             if not sig_vals_str: 
                 print(f"[WARN] Empty signal values for read {read_id}")
-            
-            process = sp.Popen('./polyA', stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, text=True)
-            process.stdin.write(f"{sig_vals_str}\n")
+
+            if any(val in sig_vals_str for val in ['nan', 'inf', '-inf']):
+                 print(f"[DEBUG] WARNING: 'nan' or 'inf' found in signal string for read {read_id}. This might cause issues for polyA.")
+
+            process = sp.Popen(['./polyA'], stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE, text=True)
+            process.stdin.write(f"{sig_vals_str}\n") 
             process.stdin.flush()
             stdout, stderr = process.communicate()
             rc = process.returncode # int 
             
             if rc == 0:  
                 result_queue.put((read_id, stdout.strip()))
+                print(f"borders recieved! -->> {rc}")
             else: 
                 print(f"[ERROR] polyA finder exited with code {rc} for read {read_id}")
-
-            if stderr: 
-                print(f"[STDERR] Error for {read_id}: {stderr}")
+                if stderr != '': 
+                    print(f"[STDERR] Error for {read_id}: {stderr}")
 
         except queue.Empty:
             break
 
 
 
-def start_finder(input_file, output_path, num_workers=4):
+def start_finder(input_file, output_path):
     
     if not os.path.exists(output_path):  
         os.makedirs(output_path) 
@@ -104,20 +110,25 @@ def start_finder(input_file, output_path, num_workers=4):
     for r_id in all_read_ids:
         task_queue.put(r_id)
 
-    processes = []
-    for _ in range(num_workers):
-        p = mp.Process(target=find_polya, args=(task_queue, result_queue, input_file))
-        p.start()
-        processes.append(p)
+    num_processes = os.cpu_count() 
+    
+    processes = [mp.Process(target=find_polya, args=(task_queue, result_queue, input_file))
+         for _ in range(num_processes)]
+    
+    for process in processes:
+        process.start()
 
-    for p in processes:
-        p.join()
+    for process in processes:
+        process.join()
 
-    results = []
+    #results = []
     while not result_queue.empty():
-        results.append(result_queue.get())
-
-    return results
+        #results.append(result_queue.get())
+        read_id, borders = result_queue.get()
+        with open (save_file, 'a') as f: 
+            f.write(f"{read_id},{borders}\n")
+    
+    #return results
 
 
 
@@ -169,7 +180,7 @@ def split_segment_input(input_read_data: str, output_path: str, summary_file_pat
     
             number_of_processes = os.cpu_count()
             
-            processes = [mp.Process(target=find_polya, args=(task_queue, result_queue, read_object)) 
+            processes = [mp.Process(target=find_polya, args=(task_queue, result_queue, file)) 
                          for _ in range(number_of_processes)]
     
             for proc in processes:
@@ -190,15 +201,15 @@ def split_segment_input(input_read_data: str, output_path: str, summary_file_pat
 def main(): 
 
     parser = argparse.ArgumentParser(description="Process and Save output file.")
-    parser.add_argument('-i', "--input_dir", 
+    parser.add_argument("--input_dir", 
                         type=str, required=True, 
                         help="Path to directory containing input ONT read data in FAST5, POD5, or SLOW5 format.")
     
-    parser.add_argument('-o', "--output_dir", 
+    parser.add_argument("--output_dir", 
                         type=str, required=True, 
                         help="Directory to save output files.")
     
-    parser.add_argument('-s', "--summary_file", 
+    parser.add_argument("--summary_file", 
                         type=str, required=False, 
                         help="Path to the sequence summary file.")
     
@@ -211,7 +222,9 @@ def main():
     else:  
         for read_file in input_path: 
             start_finder(read_file, args.output_dir) 
-            
+    
+    
+    # split_segment_input(args.input_dir, args.output_dir, args.summary_file)        
 
 
     #try:
