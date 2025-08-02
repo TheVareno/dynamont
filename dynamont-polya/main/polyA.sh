@@ -1,7 +1,7 @@
 # polyA_alt.py 
 # polyA.py
 
-time python polyA_alt.py --input_dir /home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/input_data/FAX28269_36c48ee6_b042d0cd_0.fast5 --output_dir /home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/output_data 
+time python polyA.py --input_dir /home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/input_data/subset_100_reads0.fast5 --output_dir /home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/output_data --bam_file /home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/input_data/FAX28269.bam 
 
 # -s /home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/input_data/sequencing_summary_0.txt
  

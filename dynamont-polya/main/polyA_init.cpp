@@ -197,7 +197,7 @@ double* logP(const double* F, const double* B, const double Z, const size_t T) {
 }
 
 
-//! --------------------------------------------------------- BACKTRACING SECTION ------------------------------------------------------
+//! --------------------------------- BACKTRACING SECTION --------------------------------
 
 /**
  * define backtracing function after each state 
@@ -390,7 +390,7 @@ pair<list<string>, vector<size_t>> getBorders(const double* LPS, const double* L
     return make_pair(segString, borders);
 }
 
-// ----------------------------------------------------------------- TRAIN SECTION : Baum Welch -------------------------------------------------------------
+// ---------------------------- TRAIN SECTION : Baum Welch -------------------------------
 
 /**
  * DIST & PARAM IN -> 60 READS : 
@@ -466,8 +466,10 @@ void trainParams(
                                                                                                     s, l1, l2, a1, a2, pa1, pa2, tr1, tr2, Zf);  
 
     // send parameters to stdout for each read 
-    cout << "S:" << newS << "; L1:" << newL1 << "; L2:" << newL2 << "; A1:" << newA1 << "; A2:" << newA2 << "; PA1:" << newPA1 
-         << "; PA2:" << newPA2 << "; TR1:" << newTR1 << "; TR2:" << newTR2 << endl;
+    cout << "S:" << newS << "; L1:" << newL1 << "; L2:" << newL2 << "; A1:" << newA1 
+         << "; A2:" << newA2 << "; PA1:" << newPA1 
+         << "; PA2:" << newPA2 << "; TR1:" << newTR1 
+         << "; TR2:" << newTR2 << endl;
     
     cout.flush(); 
 }
@@ -475,10 +477,16 @@ void trainParams(
 
 //! ---------------------------- LENGTH ESTIMATION ------------------------
 
+/*
+* avg_signal_value_per_nt = number of samples (ns-tag value) / read_length_nt 
+* N -> T: n * avg_signal_value_per_nt 
+* T -> N: t / avg_signal_value_per_nt
+*/
 
 
 
-//! -------------------------------------------------------------------------- MAIN SECTION ---------------------------------------------------------------------------
+
+//! ---------------------------- MAIN SECTION ----------------------------
 
 /**
  * Read signal and read from stdin until the TERM_STRING is seen 
@@ -666,7 +674,7 @@ int main(int argc, char* argv[]) {
         pair<list<string>, vector<size_t>> pair = getBorders(LPS, LPL, LPA, LPPA, LPTR, T);
 
         for (auto const& border : pair.second) {
-            std::cout << border << " "; 
+            std::cout << border << ","; 
         }
         cout << endl; 
 

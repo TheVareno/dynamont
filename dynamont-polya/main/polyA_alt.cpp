@@ -26,6 +26,7 @@ inline constexpr double EPSILON = 1e-5; // chose by eye just to distinguish real
 // necessary for INFINITY usage
 static_assert(numeric_limits<double>::is_iec559, "IEEE 754 required");
 
+
 //! ------------------------------------------ PDFs, Forward, Backward & Posterior Probability ----------------------------------------------
 
 /** 
@@ -499,9 +500,8 @@ int main() {
     const double* LPTR = logP(forTR, backTR, Zf, T);
     
     vector<size_t> borders = getBorders(LPS, LPL, LPA, LPPA, LPTR, T);
-    
-    cout << borders;  
-    
+    // print boders out 
+
     if (borders.empty()){
         printf("segmentation failed!");
         // always clean up before return 

@@ -53,7 +53,7 @@ def get_read_data(input_path: str) -> any:
 - searches in given basecalled file in bam format for read lenght in 
 - returns the a dict of all read ids as key, sampling rate as value    
 """
-def calculate_sample_rate(read_id: str, bam_file: str, mode='rb')-> dict: 
+def calculate_sample_rate(bam_file: str, mode='rb')-> dict: 
 
     samfile = pysam.AlignmentFile(bam_file, mode, check_sq=False) 
     read_id_length_pairs = {} 
@@ -61,10 +61,9 @@ def calculate_sample_rate(read_id: str, bam_file: str, mode='rb')-> dict:
     for read in samfile.fetch(until_eof=True): 
         
         read_name = read.query_name
-        # tags = dict(read.tags) 
-        
+        tags = dict(read.tags) 
         read_nt_length = int(read.query_length)
-        ns = int(dict(read.tags['ns'])) 
+        ns = int(tags['ns']) 
         read_avg_sig_per_nt = ns / read_nt_length 
 
         read_id_length_pairs.update({read_name: read_avg_sig_per_nt})
@@ -106,7 +105,7 @@ def find_polya(task_queue: mp.Queue, result_queue: mp.Queue, input_file: str):
             
             if rc == 0:  
                 result_queue.put((read_id, stdout.strip()))
-                print(f"borders recieved! -->> {rc}")
+                #print(f"borders recieved! -->> {rc}")
             else: 
                 print(f"[ERROR] polyA finder exited with code {rc} for read {read_id}")
                 if stderr != '': 
@@ -148,19 +147,17 @@ def start_finder(input_file, output_path, sample_rates: dict):
         process.join()
 
 
-
-    #results = []
     while not result_queue.empty():
         
         #results.append(result_queue.get())
         
         read_id, borders = result_queue.get() 
+        borders = borders.split(',') 
         polyA_estimated_lenght = (int(borders[1]) - int(borders[0])) / sample_rates[read_id]
 
         with open (save_file, 'a') as f: 
             f.write(f"{read_id},{borders[0]},{borders[1]},{polyA_estimated_lenght}\n")
     
-    #return results
 
 
 
