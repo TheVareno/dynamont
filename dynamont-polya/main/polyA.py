@@ -14,10 +14,10 @@ import argparse
 from hampel import hampel # type: ignore
 import subprocess as sp
 import multiprocessing as mp
-import queue
+from multiprocessing import queues
 import os   
-from typing import List
-from pathlib import Path 
+import math 
+import queue
 import pysam # type: ignore
  
 def get_read_data(input_path: str) -> any:
@@ -68,16 +68,19 @@ def calculate_sample_rate(bam_file: str, mode='rb')-> dict:
 
         read_id_length_pairs.update({read_name: read_avg_sig_per_nt})
     
-    return read_avg_sig_per_nt
+    return read_id_length_pairs
 
 def find_polya(task_queue: mp.Queue, result_queue: mp.Queue, input_file: str): 
 
     read_object = read(input_file)
 
     while True:
+        
         try:
             read_id = task_queue.get_nowait() 
- 
+            if read_id is None: 
+                break 
+          
             z_normalized_signal_values = read_object.getZNormSignal(read_id, mode='mean')
             filter_object = hampel(z_normalized_signal_values, window_size=5, n_sigma=6.0)
             filtered_signal_values = filter_object.filtered_data
@@ -88,9 +91,6 @@ def find_polya(task_queue: mp.Queue, result_queue: mp.Queue, input_file: str):
             
             sig_vals_str = ','.join(map(str, filtered_signal_values))
             
-            with open('signal.txt', 'w') as f:
-                f.write(sig_vals_str)
-
             if not sig_vals_str: 
                 print(f"[WARN] Empty signal values for read {read_id}")
 
@@ -105,23 +105,25 @@ def find_polya(task_queue: mp.Queue, result_queue: mp.Queue, input_file: str):
             
             if rc == 0:  
                 result_queue.put((read_id, stdout.strip()))
-                #print(f"borders recieved! -->> {rc}")
+                
             else: 
                 print(f"[ERROR] polyA finder exited with code {rc} for read {read_id}")
-                if stderr != '': 
+                if stderr: 
                     print(f"[STDERR] Error for {read_id}: {stderr}")
+        
+        except Exception as e:
+            print(f"[EXCEPTION] Read {read_id} failed: {e}")
+            continue
+        
+        result_queue.put(None)
 
-        except queue.Empty:
-            break
 
-
-
-def start_finder(input_file, output_path, sample_rates: dict):
+def start_finder(input_file: str, output_path: str, sample_rates: dict):
     
     if not os.path.exists(output_path):  
         os.makedirs(output_path) 
     
-    save_file = os.path.join(output_path, f'output_test.csv')
+    save_file = os.path.join(output_path, f'length_estimations.csv')
 
     with open(save_file, 'w') as f: # file exist. check 
         f.write("Read ID, poly(A) start, poly(A) end, poly(A) estimated length\n")
@@ -132,32 +134,89 @@ def start_finder(input_file, output_path, sample_rates: dict):
     read_object = read(input_file)         
     all_read_ids = read_object.getReads() 
 
-    for r_id in all_read_ids:
-        task_queue.put(r_id)
+    for read_id in all_read_ids:
+        task_queue.put(read_id)
 
-    num_processes = os.cpu_count() 
-    
+    num_processes = 4
+    for _ in range(num_processes):
+        task_queue.put(None)
+
     processes = [mp.Process(target=find_polya, args=(task_queue, result_queue, input_file))
          for _ in range(num_processes)]
     
     for process in processes:
         process.start()
 
+    results = [] 
+    completed_results = 0 
+    completed_workers = 0 
+    total_tasks = len(all_read_ids)
+
+    """
+    while completed_workers < total_tasks: 
+        try:                 
+            read_id, borders = result_queue.get(timeout=2) 
+            borders = borders.split(',') 
+            pA_est_len = (int(borders[0]) - int(borders[1])) / sample_rates[read_id]
+            results.append((read_id, borders[1], borders[0], math.ceil(pA_est_len)))
+            print("[INFO] Completed!")
+            completed += 1
+
+        except mp.queues.Empty: 
+            print("[WARN] Result queue empty for 2s - waiting...")
+            continue
+
+        except Exception as e: 
+            print(f"[ERROR] Failed processing result: {e}")
+
     for process in processes:
         process.join()
 
-
-    while not result_queue.empty():
-        
-        #results.append(result_queue.get())
-        
-        read_id, borders = result_queue.get() 
-        borders = borders.split(',') 
-        polyA_estimated_lenght = (int(borders[1]) - int(borders[0])) / sample_rates[read_id]
-
-        with open (save_file, 'a') as f: 
-            f.write(f"{read_id},{borders[0]},{borders[1]},{polyA_estimated_lenght}\n")
+    with open (save_file, 'a') as f: 
+        for result in results:
+            f.write(f"{result[0]},{result[1]},{result[2]},{result[3]}\n")
     
+    print(f"[INFO] Done. Wrote {len(results)} read estimations to {save_file}.")
+    """
+    while completed_workers < num_processes:
+        try:                 
+            result = result_queue.get(timeout=5)
+            
+            if result is None:  # Worker finished signal
+                completed_workers += 1
+                print(f"[INFO] Worker {completed_workers}/{num_processes} completed")
+            else:
+                read_id, borders = result
+                borders = borders.split(',') 
+                pA_est_len = (int(borders[0]) - int(borders[1])) / sample_rates[read_id]
+                results.append((read_id, borders[1], borders[0], math.ceil(pA_est_len)))
+                completed_results += 1
+                print(f"[INFO] Processed result {completed_results}/{total_tasks}")
+
+        except mp.queues.Empty:  
+            print("[WARN] Result queue empty for 5s - waiting...")
+            alive_processes = [p for p in processes if p.is_alive()]
+            if not alive_processes:
+                print("[WARN] All processes finished but still waiting for results")
+                break
+
+        except Exception as e: 
+            print(f"[ERROR] Failed processing result: {e}")
+
+    # Wait for all processes to finish
+    for process in processes:
+        process.join()
+
+    # Write results to file
+    with open(save_file, 'a') as f: 
+        for result in results:
+            f.write(f"{result[0]},{result[1]},{result[2]},{result[3]}\n")
+    
+    print(f"[INFO] Done. Wrote {completed_results} read estimations to {save_file}.")
+    print(f"[INFO] Processed {completed_results}/{total_tasks} tasks successfully")
+
+
+
 
 
 
@@ -255,23 +314,6 @@ def main():
             start_finder(read_file, args.output_dir, read_id_sample_rate_pairs) 
     
     
-    # split_segment_input(args.input_dir, args.output_dir, args.summary_file)        
-
-
-    #try:
-        # read_data_files = get_read_data(args.input_dir)  
-        
-        #for read_file in read_data_files:
-
-    #except FileNotFoundError as e:
-    #    print(f"Error: {e}")
-    #    print("Please ensure the directory exists and the path is correct.")
-    #except ValueError as e:
-    #    print(f"Error: {e}")
-    #    print("Please ensure the directory contains .fast5, .pod5, or .slow5 files.")
-    #except Exception as e: 
-    #    print(f"An unexpected error occurred: {e}")
-
 
     
     
@@ -281,12 +323,3 @@ if __name__ == '__main__' :
     main()
 
 
-
-
-
-
-"""
-with open(save_file, 'w') as f: # file exist. check 
-    f.write("Read ID, poly(A) start, poly(A) end, poly(A) estimated length \n")
-"""
-    

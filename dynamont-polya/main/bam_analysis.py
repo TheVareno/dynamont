@@ -17,8 +17,10 @@ for read in samfile.fetch(until_eof=True):
         #for pair in tags:
         #        print(f'{pair} ---- {tags[pair]}')
         
-        if read_count > 100:
+        if read_count > 100: 
                 break 
+
+
 
 
 
