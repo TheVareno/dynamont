@@ -2,7 +2,7 @@
 
 """
 author: Hadi Vareno
-e-mail: mohammad.noori.vareno@uni-jena.de
+e-mail: hadivareno@gmail.com
 github: https://github.com/TheVareno
 """
  
@@ -20,6 +20,7 @@ import math
 import queue
 import pysam # type: ignore
  
+
 def get_read_data(input_path: str) -> any:
     
     allowed_extensions = {'fast5', 'pod5', 'slow5'}
@@ -46,6 +47,20 @@ def get_read_data(input_path: str) -> any:
         return res_files
     
 
+def extract_read_names(output_dir: str, bam_file: str, mode='rb')-> str:
+    
+    alignment_file = pysam.AlignmentFile(bam_file, mode, check_sq=False)
+    all_read_names = [] 
+    for read in alignment_file.fetch(until_eof=True):
+        all_read_names.append(read.query_name)
+    
+    print(len(all_read_names))       
+    save_file = os.path.join(output_dir, 'read_names.txt')
+    with open(save_file, 'a') as read_name_file:
+        for read_name in all_read_names: 
+            read_name_file.write(f"{read_name}\n")
+
+    return save_file
 
 """
 - takes basecalled bam file  
@@ -70,16 +85,17 @@ def calculate_sample_rate(bam_file: str, mode='rb')-> dict:
     
     return read_id_length_pairs
 
+
 def find_polya(task_queue: mp.Queue, result_queue: mp.Queue, input_file: str): 
 
     read_object = read(input_file)
 
-    while True:
-        
+    while True: 
         try:
-            read_id = task_queue.get_nowait() 
+            read_id = task_queue.get() 
+            
             if read_id is None: 
-                break 
+                break # break out of the while loop as tasks ends 
           
             z_normalized_signal_values = read_object.getZNormSignal(read_id, mode='mean')
             filter_object = hampel(z_normalized_signal_values, window_size=5, n_sigma=6.0)
@@ -115,7 +131,149 @@ def find_polya(task_queue: mp.Queue, result_queue: mp.Queue, input_file: str):
             print(f"[EXCEPTION] Read {read_id} failed: {e}")
             continue
         
-        result_queue.put(None)
+
+def run_polyA_finder(read_file: str, output_path: str):
+
+    print('!!!-------------------------------------------------------------!!!')
+    
+    read_file = os.path.join(output_path, read_file)
+    read_object = read(read_file) 
+    
+    all_read_ids = read_object.getReads() # 500 reads each time
+    
+    task_queue = mp.Queue()
+    result_queue = mp.Queue()
+    
+    for read_id in all_read_ids:
+        task_queue.put(read_id)
+    
+    number_of_processes = 4
+    
+    for _ in range(number_of_processes):
+        task_queue.put(None)
+    
+    processes = [mp.Process(target=find_polya, args=(task_queue, result_queue, read_file)) 
+                 for _ in range(number_of_processes)]
+    
+    for proc in processes:
+        proc.start()
+    
+    for process in processes:
+        process.join()
+    
+    return result_queue
+        
+
+def write_result_csv(save_file: str, result_queue, sample_rates: dict): 
+    
+    results = []
+    while True: 
+        try:                 
+            read_id, borders = result_queue.get(timeout=2) 
+            borders = borders.split(',') 
+            pA_est_len = abs(int(borders[0]) - int(borders[1])) / sample_rates[read_id]
+            results.append((read_id, borders[1], borders[0], math.ceil(pA_est_len)))
+            print(f"[INFO] Completed!")
+        
+        except mp.queues.Empty: 
+            print("[WARN] Result queue empty.")
+            break
+        except Exception as e: 
+            print(f"[ERROR] Failed processing result: {e}")
+            continue
+    
+    with open (save_file, 'a') as f: 
+        for result in results:
+            f.write(f"{result[0]},{result[1]},{result[2]},{result[3]}\n")
+    
+    print(f"[INFO] Done. Wrote {len(results)} read estimations to {save_file}.")
+   
+
+def clear_output_dir(output_dir): 
+    for file in os.listdir(output_dir): 
+        if file.endswith(('.fast5', 'pod5', 'slow5', 'txt')):
+            os.remove(file)
+
+
+def main(): 
+
+    parser = argparse.ArgumentParser(description="Process and Save output file.")
+    parser.add_argument("--input_dir", 
+                        type=str, required=True, 
+                        help="Path to directory containing input ONT read data in FAST5, POD5, or SLOW5 format.")
+    
+    parser.add_argument("--output_dir", 
+                        type=str, required=True, 
+                        help="Directory to save output files.")
+   
+    parser.add_argument("--bam_file", 
+                        type=str, required=True, 
+                        help="Path to basecalled bam file.")
+    
+    args = parser.parse_args()
+
+    read_names_file = extract_read_names(args.output_dir, args.bam_file)
+    
+    read_id_sample_rate_pairs = calculate_sample_rate(args.bam_file)
+        
+    if not os.path.exists(args.output_dir):  
+        os.makedirs(args.output_dir) 
+    
+    save_file = os.path.join(args.output_dir, f'tail_info.csv')
+    with open(save_file, 'w') as f:  
+        f.write("Read ID, poly(A) start,poly(A) end,poly(A) estimated length \n")
+    
+    splitter = Fast5Filter(
+                input_folder=args.input_dir, 
+                output_folder=args.output_dir, 
+                read_list_file=read_names_file,
+                filename_base="subset",
+                batch_size=500, 
+                threads=1,
+                recursive=False,
+                file_list_file=None,
+                follow_symlinks=False,
+                target_compression=None)
+
+    splitter.run_batch() 
+    
+    for read_file in os.listdir(args.output_dir): 
+        if read_file.endswith((".fast5", ".pod5", ".slow5")): 
+            result_queue = run_polyA_finder(read_file, args.output_dir)
+
+        write_result_csv(save_file, result_queue, read_id_sample_rate_pairs)
+    
+    # clear_output_dir(args.output_dir)
+    
+    """
+    #! non-split approach  -> stalling! (?)
+    
+    input_path = get_read_data(args.input_dir)
+    
+    if isinstance(input_path, str): 
+        result_queue = run_polyA_finder(input_path, args.output_dir)
+    else:  
+        for read_file in input_path: 
+            # TODO multiple lines in file!   
+            # result_queue += run_polyA_finder(read_file, args.output_dir)
+            pass
+    
+    write_result_csv(save_file, result_queue, read_id_sample_rate_pairs)
+    """
+    
+    
+
+if __name__ == '__main__' : 
+    main()
+
+
+
+
+
+
+
+"""
+#! just in case 
 
 
 def start_finder(input_file: str, output_path: str, sample_rates: dict):
@@ -152,7 +310,7 @@ def start_finder(input_file: str, output_path: str, sample_rates: dict):
     completed_workers = 0 
     total_tasks = len(all_read_ids)
 
-    """
+    
     while completed_workers < total_tasks: 
         try:                 
             read_id, borders = result_queue.get(timeout=2) 
@@ -177,7 +335,7 @@ def start_finder(input_file: str, output_path: str, sample_rates: dict):
             f.write(f"{result[0]},{result[1]},{result[2]},{result[3]}\n")
     
     print(f"[INFO] Done. Wrote {len(results)} read estimations to {save_file}.")
-    """
+    
     while completed_workers < num_processes:
         try:                 
             result = result_queue.get(timeout=5)
@@ -217,109 +375,4 @@ def start_finder(input_file: str, output_path: str, sample_rates: dict):
 
 
 
-
-
-
-def split_segment_input(input_read_data: str, output_path: str, summary_file_path: str):
-
-    #name_read_data = input_read_data.split()[0]
-        
-    if not os.path.exists(output_path):  
-        os.makedirs(output_path) 
-    
-    save_file = os.path.join(output_path, f'output_test.csv')
-
-    with open(save_file, 'w') as f: # file exist. check 
-        f.write("Read ID, poly(A) end, adapter end, leader end, start end\n")
-    
-    """
-    with open(save_file, 'w') as f: # file exist. check 
-        f.write("Read ID, poly(A) start, poly(A) end, poly(A) estimated length \n")
-    """
-
-    splitter = Fast5Filter(
-                input_folder=input_read_data, 
-                output_folder=output_path, 
-                read_list_file=summary_file_path,
-                filename_base="subset",
-                batch_size=500, 
-                threads=1,
-                recursive=False,
-                file_list_file=None,
-                follow_symlinks=False,
-                target_compression=None)
-
-    splitter.run_batch() 
-
-    for file in os.listdir(output_path): 
-
-        if file.endswith(".fast5") or file.endswith(".pod5") or file.endswith(".slow5"): 
-            
-            file = os.path.join(output_path, file)
-            read_object = read(file) # needs file path ends with .fast5 / .pod5 / .slow5
-            
-            all_read_ids = read_object.getReads() # 500 each time
-            
-            task_queue = mp.Queue()
-            result_queue = mp.Queue()
-
-            for read_id in all_read_ids:
-                task_queue.put(read_id)
-    
-            number_of_processes = os.cpu_count()
-            
-            processes = [mp.Process(target=find_polya, args=(task_queue, result_queue, file)) 
-                         for _ in range(number_of_processes)]
-    
-            for proc in processes:
-                proc.start()
-        
-            for proc in processes:
-                proc.join()
-    
-            while not result_queue.empty():
-                read_id, borders_length = result_queue.get()
-                with open (save_file, 'a') as f: 
-                    f.write(f"{read_id},{borders_length}\n")
-        else: 
-            continue
-
-
-
-def main(): 
-
-    parser = argparse.ArgumentParser(description="Process and Save output file.")
-    parser.add_argument("--input_dir", 
-                        type=str, required=True, 
-                        help="Path to directory containing input ONT read data in FAST5, POD5, or SLOW5 format.")
-    
-    parser.add_argument("--output_dir", 
-                        type=str, required=True, 
-                        help="Directory to save output files.")
-    
-    parser.add_argument("--bam_file", 
-                        type=str, required=False, 
-                        help="Path to basecalled bam file.")
-    
-    args = parser.parse_args()
-
-    input_path = get_read_data(args.input_dir)
-
-    read_id_sample_rate_pairs = calculate_sample_rate(args.bam_file)
-
-    if isinstance(input_path, str): 
-        start_finder(input_path, args.output_dir, read_id_sample_rate_pairs) 
-    else:  
-        for read_file in input_path: 
-            start_finder(read_file, args.output_dir, read_id_sample_rate_pairs) 
-    
-    
-
-    
-    
-
-
-if __name__ == '__main__' : 
-    main()
-
-
+"""
