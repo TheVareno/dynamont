@@ -66,7 +66,6 @@ double log_gumbel_l_pdf(const double sig_val, const double loc, const double sca
     }
 
     const double z = - (sig_val - loc) / scale;
-
     return -z - exp(-z);
 }
 
@@ -82,7 +81,6 @@ double log_gumbel_r_pdf(const double sig_val, const double loc, const double sca
     }
 
     const double z = (sig_val - loc) / scale;
-    
     return  -z - exp(-z);
 }
 

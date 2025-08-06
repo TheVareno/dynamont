@@ -11,7 +11,14 @@
 #include <sstream> // file io
 #include <cmath> //log1p
 #include <algorithm> //stable_sort
-#include <numeric> //iota
+#include <numeric> //iota 
+#include <cstdio> 
+
+inline constexpr double EPSILON = 1e-5; // chose by eye just to distinguish real errors from numeric errors 
+
+// Asserts doubleing point compatibility at compile time  // ?
+// necessary for INFINITY usage 
+static_assert(numeric_limits<double>::is_iec559, "IEEE 754 required");
 
 
 // ========= PROBABILITY DENSITY FUNCTIONS ===========
@@ -24,8 +31,8 @@
  * start gumbel r, loc: -1.552134, scale: 0.415937
 */
 
-inline const double pi = 3.14159265358979323846;
 
+inline const double pi = 3.14159265358979323846;
 
 // logarithm t distribution PDF : checked the correctness with scipy.stats.t
 inline constexpr double t_loc_polyA = 0.839093; 
@@ -102,7 +109,6 @@ inline double log_gumbel_r_start(const double signal_value)
 }
 
 
- 
 
 // ========= FORWARD & BACKWARD ALGORITHM ===========
 
@@ -111,17 +117,17 @@ inline double log_gumbel_r_start(const double signal_value)
  * Calculate forward matrices using logarithmic values
  * 1D array for each state : 5 1D arrays
  * S L A PA TR : initialized matrices for each state
- */
+*/
 
 
-#define EMIT(prev, func, sigval, trans) ((prev) + func(sigval) + (trans))
+// #define EMIT(prev, func, sigval, trans) ((prev) + func(sigval) + (trans))
 
 // alternative 
-/*
 inline double log_emission_step(double prev, double (*emission_func)(double), double sig_val, double transition)
 {
     return prev + emission_func(sig_val) + transition;
 }
+/*
 */
 
 
@@ -141,21 +147,20 @@ inline void logF(double *sig, double *S, double *L, double *A, double *PA, doubl
         polya = -INFINITY;
         transcript = -INFINITY;
 
-        S[t] = logPlus(S[t - 1], EMIT(S[t - 1], log_gumbel_r_start, sig[t - 1], s));
+        S[t] = logPlus(S[t - 1], log_emission_step(S[t - 1], log_gumbel_r_start, sig[t - 1], s));
 
-        L[t] = logPlus(S[t - 1], EMIT(S[t - 1], log_gumbel_l_leader, sig[t - 1], l1));
-        L[t] = logPlus(L[t - 1], EMIT(L[t - 1], log_gumbel_l_leader, sig[t - 1], l2));
+        L[t] = logPlus(L[t - 1], log_emission_step(S[t - 1], log_gumbel_l_leader, sig[t - 1], l1));
+        L[t] = logPlus(L[t - 1], log_emission_step(L[t - 1], log_gumbel_l_leader, sig[t - 1], l2));
 
-        A[t] = logPlus(L[t - 1], EMIT(L[t - 1], log_t_adapter, sig[t - 1], a1));
-        A[t] = logPlus(A[t - 1], EMIT(A[t - 1], log_t_adapter, sig[t - 1], a2));
+        A[t] = logPlus(A[t - 1], log_emission_step(L[t - 1], log_t_adapter, sig[t - 1], a1));
+        A[t] = logPlus(A[t - 1], log_emission_step(A[t - 1], log_t_adapter, sig[t - 1], a2));
 
-        PA[t] = logPlus(A[t - 1], EMIT(A[t - 1], log_t_polyA, sig[t - 1], pa1));
-        PA[t] = logPlus(PA[t - 1], EMIT(PA[t - 1], log_t_polyA, sig[t - 1], pa2));
+        PA[t] = logPlus(PA[t - 1], log_emission_step(A[t - 1], log_t_polyA, sig[t - 1], pa1));
+        PA[t] = logPlus(PA[t - 1], log_emission_step(PA[t - 1], log_t_polyA, sig[t - 1], pa2));
 
-        TR[t] = logPlus(PA[t - 1], EMIT(PA[t - 1], log_gumbel_r_transcript, sig[t - 1], tr1));
-        TR[t] = logPlus(TR[t - 1], EMIT(TR[t - 1], log_gumbel_r_transcript, sig[t - 1], tr2));
+        TR[t] = logPlus(TR[t - 1], log_emission_step(PA[t - 1], log_gumbel_r_transcript, sig[t - 1], tr1));
+        TR[t] = logPlus(TR[t - 1], log_emission_step(TR[t - 1], log_gumbel_r_transcript, sig[t - 1], tr2));
     } 
-
 }
 
 /**
@@ -178,19 +183,19 @@ inline void logB(double *sig, double *S, double *L, double *A, double *PA, doubl
         polya = -INFINITY;
         transcript = -INFINITY;
 
-        S[t] = logPlus(S[t + 1], EMIT(S[t + 1], log_gumbel_r_start, sig[t], s));
-        S[t] = logPlus(S[t + 1], EMIT(L[t + 1], log_gumbel_l_leader, sig[t], l1));
+        S[t] = logPlus(S[t], log_emission_step(S[t + 1], log_gumbel_r_start, sig[t], s));
+        S[t] = logPlus(S[t], log_emission_step(L[t + 1], log_gumbel_l_leader, sig[t], l1));
 
-        L[t] = logPlus(L[t + 1], EMIT(L[t + 1], log_gumbel_l_leader, sig[t], l2));
-        L[t] = logPlus(L[t + 1], EMIT(A[t + 1], log_t_adapter, sig[t], a1));
+        L[t] = logPlus(L[t], log_emission_step(L[t + 1], log_gumbel_l_leader, sig[t], l2));
+        L[t] = logPlus(L[t], log_emission_step(A[t + 1], log_t_adapter, sig[t], a1));
 
-        A[t] = logPlus(A[t + 1], EMIT(A[t + 1], log_t_adapter, sig[t], a2));
-        A[t] = logPlus(A[t + 1], EMIT(PA[t + 1], log_t_polyA, sig[t], pa1));
+        A[t] = logPlus(A[t], log_emission_step(A[t + 1], log_t_adapter, sig[t], a2));
+        A[t] = logPlus(A[t], log_emission_step(PA[t + 1], log_t_polyA, sig[t], pa1));
 
-        PA[t] = logPlus(PA[t + 1], EMIT(PA[t + 1], log_t_polyA, sig[t], pa2));
-        PA[t] = logPlus(PA[t + 1], EMIT(TR[t + 1], log_gumbel_r_transcript, sig[t], tr1));
+        PA[t] = logPlus(PA[t], log_emission_step(PA[t + 1], log_t_polyA, sig[t], pa2));
+        PA[t] = logPlus(PA[t], log_emission_step(TR[t + 1], log_gumbel_r_transcript, sig[t], tr1));
 
-        TR[t] = logPlus(TR[t + 1], EMIT(TR[t + 1], log_gumbel_r_transcript, sig[t], tr2));        
+        TR[t] = logPlus(TR[t], EMIT(TR[t + 1], log_gumbel_r_transcript, sig[t], tr2));        
     }
 }
 
@@ -208,191 +213,227 @@ inline double *logP(const double *F, const double *B, const double Z, const size
     return LP;
 } 
 
-
-
-
 // ========= BACKTRACKING ===========
-
 
 /**
  * define backtracing function after each state
 */
 
+
+struct Viterbi{ 
+    const double* S; 
+    const double* L; 
+    const double* A; 
+    const double* PA; 
+    const double* TR; 
+    const double* LPS; 
+    const double* LPL; 
+    const double* LPA; 
+    const double* LPPA; 
+    const double* LPTR;  
+
+    ModelData(const double* s, const double* l, const double* a, const double* pa, const double* tr,
+            const double* lps, const double* lpl, const double* lpa, const double* lppa, const double* lptr)
+        : S(s), L(l), A(a), PA(pa), TR(tr), LPS(lps), LPL(lpl), LPA(lpa), LPPA(lppa), LPTR(lptr) {}
+};
+
+
+
 // define the functions due to circular calls 
-inline void funcS(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
-           const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
-           list<string> &segString, vector<size_t> &borders, string prevState); 
 
-inline void funcL(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
-           const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
-           list<string> &segString, vector<size_t> &borders, string prevState); 
+inline void funcL(const size_t t, const ModelData& data, 
+                std::list<std::string>& segString, 
+                std::vector<size_t>& borders, 
+                const std::string& prevState); 
 
-inline void funcA(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
-           const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
-           list<string> &segString, vector<size_t> &borders, string prevState); 
+inline void funcA(const size_t t, const ModelData& data, 
+                std::list<std::string>& segString, 
+                std::vector<size_t>& borders, 
+                const std::string& prevState); 
 
-inline void funcPA(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
-            const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
-            list<string> &segString, vector<size_t> &borders, string prevState); 
+inline void funcPA(const size_t t, const ModelData& data, 
+                std::list<std::string>& segString, 
+                std::vector<size_t>& borders, 
+                const std::string& prevState); 
 
-inline void funcTR(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
-            const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
-            list<string> &segString, vector<size_t> &borders, string prevState);
+inline void funcTR(const size_t t, const ModelData& data, 
+                std::list<std::string>& segString, 
+                std::vector<size_t>& borders, 
+                const std::string& prevState); 
 
-// Backtracking Funcs Declaration
-inline void funcS(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
-           const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
-           list<string> &segString, vector<size_t> &borders, string prevState) 
+
+inline void funcS(const size_t t, const ModelData& data, 
+                std::list<std::string>& segString, 
+                std::vector<size_t>& borders, 
+                const std::string& prevState); 
 {
-
-    // base case only in S as last region
-    if (t == 0)
-    {
+    if (t == 0) 
+    { 
         return;
-    }
+    } 
 
-    if (S[t] == S[t - 1] + LPS[t])
-    {
-        prevState = "START";
-        segString.push_back(prevState);
-        funcS(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
-    }
+    const double current_S = data.S[t]; 
+    const double prev_S = data.S[t - 1]; 
+    const double prev_TR = data.TR[t - 1]; 
+    const double lps_t = data.LPS[t]; 
 
-    /*
-     */
-    if (S[t] == TR[t - 1] + LPS[t])
+    const bool from_start = (current_S == prev_S + lps_t);
+    const bool from_transcript = (current_S == prev_TR + lps_t);
+    
+    if(from_start)
     {
-        const size_t border_start = t;
-        borders.push_back(border_start);
-        prevState = "TRANSCRIPT";
-        segString.push_back(prevState);
-        funcTR(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
+        segString.emplace_back("START"); 
+        funcS(t - 1, data, segString, border, "START"); 
     }
+    else if (from_transcript)
+    {
+        borders.push_back(t); 
+        segString.emplace_back("TRANSCRIPT"); 
+        funcTR(t - 1, data, segString, border, "TRANSCRIPT");
+    } 
 }
 
-inline void funcL(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
-           const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
-           list<string> &segString, vector<size_t> &borders, string prevState)
+inline void funcS(const size_t t, const ModelData& data, 
+                std::list<std::string>& segString, 
+                std::vector<size_t>& borders, 
+                const std::string& prevState); 
 {
+    if (t == 0) 
+    { 
+        return;
+    } 
 
-    if (L[t] == S[t - 1] + LPL[t])
-    {
-        const size_t border_start = t;
-        borders.push_back(border_start);
-        prevState = "START";
-        segString.push_back(prevState);
-        funcS(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
-    }
+    const double current_S = data.S[t]; 
+    const double prev_S = data.S[t - 1]; 
+    const double prev_TR = data.TR[t - 1]; 
+    const double lps_t = data.LPS[t]; 
 
-    if (L[t] == L[t - 1] + LPL[t])
+    const bool from_start = (current_S == prev_S + lps_t);
+    const bool from_transcript = (current_S == prev_TR + lps_t);
+    
+    if(from_start)
     {
-        prevState = "LEADER";
-        segString.push_back(prevState);
-        funcL(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
+        segString.emplace_back("START"); 
+        funcS(t - 1, data, segString, border, "START"); 
     }
+    else if (from_transcript)
+    {
+        borders.push_back(t); 
+        segString.emplace_back("TRANSCRIPT"); 
+        funcTR(t - 1, data, segString, border, "TRANSCRIPT");
+    } 
 }
 
-inline void funcA(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
-           const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
-           list<string> &segString, vector<size_t> &borders, string prevState)
+
+inline void funcL(const size_t t, const ModelData& data, 
+                std::list<std::string>& segString, 
+                std::vector<size_t>& borders, 
+                const std::string& prevState); 
 {
+    
+    const double crnt_L = data.L[t]; 
+    const double prev_L = data.L[t - 1]; 
+    const double prev_S = data.S[t - 1]; 
+    const double lpl_t = data.LPL[t]; 
 
-    if (A[t] == L[t - 1] + LPA[t])
+    const bool from_leader = (crnt_L == prev_L + lpl_t);
+    const bool from_start = (crnt_L == prev_S + lpl_t);
+    
+    if(from_leader)
     {
-        const size_t border_leader = t;
-        borders.push_back(border_leader);
-        prevState = "LEADER";
-        segString.push_back(prevState);
-        funcL(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
+        segString.emplace_back("LEADER"); 
+        funcL(t - 1, data, segString, border, "LEADER"); 
     }
-
-    if (A[t] == A[t - 1] + LPA[t])
-    {
-        prevState = "ADAPTOR";
-        segString.push_back(prevState);
-        funcA(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
-    }
+    else if (from_adapter)
+    {   
+        // Ach ja! here is the border bec we changed the state!
+        borders.push_back(t); 
+        segString.emplace_back("STRART"); 
+        funcS(t - 1, data, segString, border, "START");
+    } 
 }
 
-inline void funcPA(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
-            const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
-            list<string> &segString, vector<size_t> &borders, string prevState)
+
+inline void funcA(const size_t t, const ModelData& data, 
+                std::list<std::string>& segString, 
+                std::vector<size_t>& borders, 
+                const std::string& prevState); 
 {
+    
+    const double crnt_A = data.A[t]; 
+    const double prev_A = data.A[t - 1]; 
+    const double prev_L = data.L[t - 1]; 
+    const double lpa_t = data.LPA[t]; 
 
-    if (PA[t] == A[t - 1] + LPPA[t])
+    const bool from_adaptor = (crnt_A == prev_A + lpa_t);
+    const bool from_start = (crnt_A == prev_L + lpa_t);
+    
+    if(from_adapter)
     {
-        const size_t border_adaptor = t;
-        borders.push_back(border_adaptor);
-        prevState = "ADAPTOR";
-        segString.push_back(prevState);
-        funcA(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
+        segString.emplace_back("ADAPTER"); 
+        funcA(t - 1, data, segString, border, "ADAPTER"); 
     }
-
-    if (PA[t] == PA[t - 1] + LPPA[t])
-    {
-        prevState = "POLYA";
-        segString.push_back(prevState);
-        funcPA(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
-    }
+    else if (from_adapter)
+    {   
+        // Ach ja! here is the border bec we changed the state!
+        borders.push_back(t); 
+        segString.emplace_back("LEADER"); 
+        funcL(t - 1, data, segString, border, "LEADER");
+    }  
 }
 
-inline void funcTR(const size_t t, const double *S, const double *L, const double *A, const double *PA, const double *TR,
-            const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR,
-            list<string> &segString, vector<size_t> &borders, string prevState)
+
+inline void funcPA(const size_t t, const ModelData& data, 
+                std::list<std::string>& segString, 
+                std::vector<size_t>& borders, 
+                const std::string& prevState); 
 {
-    if (TR[t] == PA[t - 1] + LPTR[t])
-    {
+    
+    const double crnt_PA = data.PA[t]; 
+    const double prev_PA = data.PA[t - 1]; 
+    const double prev_A = data.A[t - 1]; 
+    const double lppa_t = data.LPPA[t]; 
 
-        const size_t border_polyA = t;
-        borders.push_back(border_polyA);
-        prevState = "POLYA";
-        segString.push_back(prevState);
-        funcPA(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
-    }
-
-    if (TR[t] == TR[t - 1] + LPTR[t])
+    const bool from_polya = (crnt_PA == prev_PA + lppa_t);
+    const bool from_adapter = (crnt_PA == prev_A + lppa_t);
+    
+    if(from_polya)
     {
-        prevState = "TRANSCRIPT";
-        segString.push_back(prevState);
-        funcTR(t - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, prevState);
+        segString.emplace_back("POLYA"); 
+        funcA(t - 1, data, segString, border, "POLYA"); 
     }
+    else if (from_adapter)
+    {   
+        // Ach ja! here is the border bec we changed the state!
+        borders.push_back(t); 
+        segString.emplace_back("ADAPTER"); 
+        funcL(t - 1, data, segString, border, "ADAPTER");
+    }  
 }
 
-/**
- * Calculate the maximum a posteriori path (backtracing) - posterioir decoding
- */
-inline string getBorders(const double *LPS, const double *LPL, const double *LPA, const double *LPPA, const double *LPTR, const size_t T)
+
+// TODO FUNCTR ! --> check so far! 
+
+
+
+
+// Calculate the maximum a posteriori path (backtracing) - posterioir decoding
+ 
+inline std::string getBorders(const double* LPS, const double* LPL, 
+                        const double* LPA, const double* LPPA, const double* LPTR, 
+                        const size_t T)
 {
 
-    double *S = new double[T];
-    double *L = new double[T];
-    double *A = new double[T];
-    double *PA = new double[T];
-    double *TR = new double[T];
+    std::vector<double> S(T, -INFINITY);
+    std::vector<double> L(T, -INFINITY); 
+    std::vector<double> A(T, -INFINITY); 
+    std::vector<double> PA(T, -INFINITY); 
+    std::vector<double> TR(T, -INFINITY); 
 
-    // Initialize M and E in one step, no need for fill_n
-    for (size_t t = 0; t < T; ++t)
-    {
-        S[t] = -INFINITY;
-        L[t] = -INFINITY;
-        A[t] = -INFINITY;
-        PA[t] = -INFINITY;
-        TR[t] = -INFINITY;
-    }
-
-    double start, leader, adapter, polya, transcript;
-    S[0] = 0;
+    S[0] = 0; 
 
     for (size_t t = 1; t < T; ++t)
     {
-
-        // TODO compress code
-        start = -INFINITY;
-        leader = -INFINITY;
-        adapter = -INFINITY;
-        polya = -INFINITY;
-        transcript = -INFINITY;
-
         S[t] = max(S[t], S[t - 1] + LPS[t]);         // s
         L[t] = max(L[t], S[t - 1] + LPL[t]);         // l1 : leave start
         L[t] = max(L[t], L[t - 1] + LPL[t]);         // l2 : stay in leader
@@ -404,65 +445,55 @@ inline string getBorders(const double *LPS, const double *LPL, const double *LPA
         TR[t] = max(TR[t], TR[t - 1] + LPTR[t]);     // tr2 : stay in trancript
     }
 
-    list<string> segString; // define string of most probabale states at T-1 backward
-    vector<size_t> borders;
-    segString.push_back("TRANSCRIPT"); // signal value at T - 1 pos. 100% in transcript region -> beginn recursion T - 2 onward
+    // define string of most probabale states at T-1 backward
+    std::list<std::string> segString; 
+    
+    std::vector<size_t> borders;
+    
+    // signal value at T - 1 pos. 100% in transcript region -> beginn recursion T - 2 onward
+    segString.push_back("TRANSCRIPT"); 
 
     funcTR(T - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, "TRANSCRIPT");
 
-    ostringstream oss;
+    std::ostringstream oss;
     for (size_t i = 0; i < borders.size(); ++i)
-    {
+    {   
+        if (i > 0) oss << ","; 
         oss << borders[i];
-        if (i < borders.size() - 1)
-        {
-            oss << ",";
-        }
     }
-
-    delete[] S;
-    delete[] L;
-    delete[] A;
-    delete[] PA;
-    delete[] TR;
 
     return oss.str();
 }
 
-
-inline void esitmate_length()
-{
-    // read the sequecning_summary 
-}
-
-
 template <typename T>
-inline void writeBorders(const string &save_file, const string &read_id, const vector<T> &borders)
+inline bool writeBorders(const std::string& save_file, const std::string& read_id, const vector<T>& borders)
 {
-    ofstream output_file(save_file, ios::app);
-
-    if (!output_file.is_open())
-    {
-        std::cerr << "Error: Unable to open file";
-        exit(EXIT_FAILURE);
+    if (borders.empty()) {
+        std::cerr << "[WARN] Empty borders vector for read_id: " << read_id << std::endl;
+        return false;
     }
 
-    output_file << read_id << ",";
+    // buil string in memery fist ! 
+    std::ostringstream oss; 
+    oss << read_id; 
 
-    for (std::size_t i = 0; i < borders.size(); ++i)
-    {
-        output_file << borders[i];
-
-        if (i < borders.size() - 1)
-        {
-            output_file << ",";
-        }
-        else
-        {
-            output_file << "\n";
-        }
+    for (const auto& border : borders) {  // Range-based for loop
+        oss << "," << border;
     }
-    output_file.close();
+    oss << "\n";    
+
+    std::ofstream output_file(save_file, std::ios::app);
+    if (!output_file.is_open()) {
+        std::cerr << "[ERROR] Unable to open file: " << save_file << std::endl;
+        return false;
+    }
+
+    output_file << oss.str();
+
+    if (output_file.fail()) {
+        std::cerr << "[ERROR] Failed to write to file" << std::endl;
+        return false;
+    }
 } 
 
 

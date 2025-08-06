@@ -219,9 +219,9 @@ def main():
     if not os.path.exists(args.output_dir):  
         os.makedirs(args.output_dir) 
     
-    save_file = os.path.join(args.output_dir, f'tail_info.csv')
+    save_file = os.path.join(args.output_dir, f'tail_info_1.csv')
     with open(save_file, 'w') as f:  
-        f.write("Read ID, poly(A) start,poly(A) end,poly(A) estimated length \n")
+        f.write("Read ID, poly(A) start,poly(A) end,poly(A) estimated length\n")
     
     splitter = Fast5Filter(
                 input_folder=args.input_dir, 
@@ -238,10 +238,10 @@ def main():
     splitter.run_batch() 
     
     for read_file in os.listdir(args.output_dir): 
+
         if read_file.endswith((".fast5", ".pod5", ".slow5")): 
             result_queue = run_polyA_finder(read_file, args.output_dir)
-
-        write_result_csv(save_file, result_queue, read_id_sample_rate_pairs)
+            write_result_csv(save_file, result_queue, read_id_sample_rate_pairs)
     
     # clear_output_dir(args.output_dir)
     

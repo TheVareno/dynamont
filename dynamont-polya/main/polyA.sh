@@ -8,12 +8,12 @@ OUTPUT_DIR="/home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/output
 ALT_OUTPUT_DIR="/home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/alt_output"
 SEQUINS_OUTPUT="/home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/Sequins_output"
 SUMMARY_FILE="/home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/alt_input/sequencing_summary_0.txt"
-BAM_FILE="/home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/Sequins/sequins_caco_24hpi_0.bam"
+BAM_FILE="/home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/input_data/FAX28269.bam"
 
 
-time python ./polyA.py \
-    --input_dir "$SEQUINS_INPUT" \
-    --output_dir "$SEQUINS_OUTPUT" \
+time python polyA.py \
+    --input_dir "$INPUT_DIR" \
+    --output_dir "$OUTPUT_DIR" \
     --bam_file "$BAM_FILE"
 
 

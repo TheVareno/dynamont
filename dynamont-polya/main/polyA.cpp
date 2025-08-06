@@ -27,7 +27,6 @@
 
 int main()
 {
-
     std::cout << fixed << showpoint;
     std::cout << setprecision(20);
 
