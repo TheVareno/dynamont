@@ -161,15 +161,16 @@ inline double log_gumbel_r_start(const double signal_value)
  * S L A PA TR : initialized matrices for each state
 */
 
-template<typename EmissionFunc>
+
+// generic function to work with different types of data type 
+template<typename EmissionFunc> // type parameter to pass it to func 
 constexpr double log_emission_step(double& prev, EmissionFunc emission_func, 
                                    double sig_val, double transition)
 {
     return prev + emission_func(sig_val) + transition;
 }
 
-
-inline void logF(double* sig, double* S, double* L, double* A, double* PA, double* TR, size_t T,
+inline void logF(const double* sig, double* S, double* L, double* A, double* PA, double* TR, size_t T,
           const double s, const double l1, const double l2, const double a1,
           const double a2, const double pa1, const double pa2, const double tr1, const double tr2)
 {
@@ -194,8 +195,8 @@ inline void logF(double* sig, double* S, double* L, double* A, double* PA, doubl
         current_A = logPlus(current_A, log_emission_step(prev_A, log_t_adapter, sig[t - 1], a2));
         A[t] = current_A;
 
-        double current_PA = logPlus(prev_PA, log_emission_step(prev_A, log_t_polyA, sig[t - 1], a1));
-        current_PA = logPlus(current_PA, log_emission_step(prev_PA, log_t_polyA, sig[t - 1], a2));
+        double current_PA = logPlus(prev_PA, log_emission_step(prev_A, log_t_polyA, sig[t - 1], pa1));
+        current_PA = logPlus(current_PA, log_emission_step(prev_PA, log_t_polyA, sig[t - 1], pa2));
         PA[t] = current_PA;
 
         double current_TR = logPlus(prev_TR, log_emission_step(prev_PA, log_gumbel_r_transcript, sig[t - 1], tr1));
@@ -217,33 +218,34 @@ inline void logB(double* sig, double* S, double* L, double* A, double* PA, doubl
                 const double s, const double l1, const double l2, const double a1,
                 const double a2, const double pa1, const double pa2, const double tr1, const double tr2)
 {
-    S[T - 1] = 0.0;    
-    L[T - 1] = 0.0;    
-    A[T - 1] = 0.0;    
-    PA[T - 1] = 0.0;    
     TR[T - 1] = 0.0;    
     
     for (size_t t = T - 2; t > 0; --t)
     {
-        const double crnt_sig = sig[t + 1];
+        const double next_sig = sig[t + 1];
 
         S[t] = logPlus(
-            log_emission_step(S[t + 1], log_gumbel_r_start, crnt_sig, s),      // S -> S
-            log_emission_step(L[t + 1], log_gumbel_l_leader, crnt_sig, l1)     // S -> L
+            log_emission_step(S[t + 1], log_gumbel_r_start, next_sig, s), 
+            log_emission_step(L[t + 1], log_gumbel_l_leader, next_sig, l1)     
         );
         
         L[t] = logPlus(
-            log_emission_step(L[t + 1], log_gumbel_l_leader, crnt_sig, l2), 
-            log_emission_step(A[t + 1], log_t_adapter, crnt_sig, a1)
+            log_emission_step(L[t + 1], log_gumbel_l_leader, next_sig, l2), 
+            log_emission_step(A[t + 1], log_t_adapter, next_sig, a1)
         );
 
         A[t] = logPlus(
-            log_emission_step(A[t + 1], log_t_adapter, crnt_sig, a2), 
-            log_emission_step(PA[t + 1], log_t_adapter, crnt_sig, pa1)
+            log_emission_step(A[t + 1], log_t_adapter, next_sig, a2), 
+            log_emission_step(PA[t + 1], log_t_polyA, next_sig, pa1)
         );
 
-        
-                
+        PA[t] = logPlus(
+            log_emission_step(PA[t + 1], log_t_polyA, next_sig, pa2), 
+            log_emission_step(TR[t + 1], log_gumbel_r_transcript, next_sig, tr1)
+        );
+
+        TR[t] = log_emission_step(TR[t + 1], log_gumbel_r_transcript, next_sig, tr2);
+
     }
 }
 
@@ -251,10 +253,10 @@ inline void logB(double* sig, double* S, double* L, double* A, double* PA, doubl
 /**
  * Calculate the logarithmic probability matrix - posterior probability
  */
-inline std::vector<double> logP(const double *F, const double *B, const double Z, const size_t T)
+inline std::vector<double> logP(const double* F, const double* B, const double Z, const size_t T)
 {
     std::vector<double> LP; 
-    LP.reverse(T);   
+    LP.reserve(T);   
 
     for (size_t t = 0; t < T; ++t)
     {
@@ -268,17 +270,17 @@ inline std::vector<double> logP(const double *F, const double *B, const double Z
 /**
  * define backtracing function after each state
 */
-struct Viterbi{ 
-    const double* S; 
-    const double* L; 
-    const double* A; 
-    const double* PA; 
-    const double* TR; 
-    const double* LPS; 
-    const double* LPL; 
-    const double* LPA; 
-    const double* LPPA; 
-    const double* LPTR;  
+struct Viterbi {
+    const double* S;
+    const double* L;
+    const double* A;
+    const double* PA;
+    const double* TR;
+    const double* LPS;
+    const double* LPL;
+    const double* LPA;
+    const double* LPPA;
+    const double* LPTR;
 
     Viterbi(const double* s, const double* l, const double* a, const double* pa, const double* tr,
             const double* lps, const double* lpl, const double* lpa, const double* lppa, const double* lptr)
@@ -402,7 +404,6 @@ inline void funcA(const size_t t, const Viterbi& data,
     }  
 }
 
-
 inline void funcPA(const size_t t, const Viterbi& data, 
                 std::list<std::string>& segString, 
                 std::vector<size_t>& borders, 
@@ -463,12 +464,10 @@ inline void funcTR(const size_t t, const Viterbi& data,
 
 //! OUTPUT AREA
 
-// Calculate the maximum a posteriori path (backtracing) - posterioir decoding
 inline std::string getBorders(const double* LPS, const double* LPL, 
                         const double* LPA, const double* LPPA, const double* LPTR, 
                         const size_t T)
 {
-
     std::vector<double> S(T, -INFINITY);
     std::vector<double> L(T, -INFINITY); 
     std::vector<double> A(T, -INFINITY); 
@@ -490,17 +489,21 @@ inline std::string getBorders(const double* LPS, const double* LPL,
         TR[t] = max(TR[t], TR[t - 1] + LPTR[t]);     // tr2 : stay in trancript
     }
 
-    // define string of most probabale states at T-1 backward
-    std::list<std::string> segString; 
+    // define string of most probabale states at T-1 backward - Maximum A-posteriori (MAP)
+    std::list<std::string> map; 
     
     std::vector<size_t> borders;
     
     // signal value at T - 1 pos. 100% in transcript region -> beginn recursion T - 2 onward
-    segString.push_back("TRANSCRIPT"); 
+    map.push_back("TRANSCRIPT"); 
 
-    funcTR(T - 1, S, L, A, PA, TR, LPS, LPL, LPA, LPPA, LPTR, segString, borders, "TRANSCRIPT");
+    Viterbi vit(S.data(), L.data(), A.data(), PA.data(), TR.data(),
+                LPS, LPL, LPA, LPPA, LPTR);
+
+    funcTR(T - 1, vit, map, borders, "TRANSCRIPT");
 
     std::ostringstream oss;
+    
     for (size_t i = 0; i < borders.size(); ++i)
     {   
         if (i > 0) oss << ","; 

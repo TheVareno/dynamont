@@ -41,9 +41,9 @@ int main()
     double tr1 = log(0.0003688666162265902);
     double tr2 = log(1.0);
 
-    string signal_values;
+    std::string signal_values;
 
-    getline(cin, signal_values);
+    std::getline(std::cin, signal_values);
 
     if (signal_values.empty())
     {
@@ -53,33 +53,33 @@ int main()
 
     // PROCESS SIGNAL : convert string to double array
     // How many signal values are there ?  T values
-    const size_t T = count(signal_values.begin(), signal_values.end(), ',') + 2; // len(sig) + 1
+    const size_t T = std::count(signal_values.begin(), signal_values.end(), ',') + 2; // len(sig) + 1
 
     // init a double array of T-1 elements for signal values
-    double *sig = new double[T - 1];
+    double* sig = new double[T - 1];
 
     // put each signal value in i-position of sig
-    string value;
-    stringstream ss(signal_values);
+    std::string value;
+    std::stringstream ss(signal_values);
     int i = 0;
 
-    while (getline(ss, value, ','))
+    while (std::getline(ss, value, ','))
     {
-        sig[i++] = stod(value);
+        sig[i++] = std::stod(value);
     }
 
     // so far we have the signal as an array of double values in //: sig
     // initialize Forward Backward algorithm calculation
-    double *forS = new double[T];
-    double *forL = new double[T];
-    double *forA = new double[T];
-    double *forPA = new double[T];
-    double *forTR = new double[T];
-    double *backS = new double[T];
-    double *backL = new double[T];
-    double *backA = new double[T];
-    double *backPA = new double[T];
-    double *backTR = new double[T];
+    double* forS = new double[T];
+    double* forL = new double[T];
+    double* forA = new double[T];
+    double* forPA = new double[T];
+    double* forTR = new double[T];
+    double* backS = new double[T];
+    double* backL = new double[T];
+    double* backA = new double[T];
+    double* backPA = new double[T];
+    double* backTR = new double[T];
 
     for (size_t t = 0; t < T; ++t)
     {
@@ -97,25 +97,25 @@ int main()
 
     // calculate segmentation probabilities, fill forward matrices
     logF(sig, forS, forL, forA, forPA, forTR, T, s, l1, l2, a1, a2, pa1, pa2, tr1, tr2);
+    
     // calculate segmentation probabilities, fill backward matrices
     logB(sig, backS, backL, backA, backPA, backTR, T, s, l1, l2, a1, a2, pa1, pa2, tr1, tr2);
     // where both values should meet each other
     const double Zf = forTR[T - 1]; // end of trancript for Forward
     const double Zb = backS[0];     // is same as beginning of start for Backward
 
-    //! ----------------------------------------------- THE START OF MAIN CALCULATATION -----------------------------------------------
+    std::vector<double> LPS = logP(forS, backS, Zf, T);
+    std::vector<double> LPL = logP(forS, backS, Zf, T);
+    std::vector<double> LPA = logP(forS, backS, Zf, T);
+    std::vector<double> LPPA = logP(forS, backS, Zf, T);
+    std::vector<double> LPTR = logP(forS, backS, Zf, T);
 
-    const double *LPS = logP(forS, backS, Zf, T);
-    const double *LPL = logP(forL, backL, Zf, T);
-    const double *LPA = logP(forA, backA, Zf, T);
-    const double *LPPA = logP(forPA, backPA, Zf, T);
-    const double *LPTR = logP(forTR, backTR, Zf, T);
-
-    string borders = getBorders(LPS, LPL, LPA, LPPA, LPTR, T);
+    std::string borders = getBorders(LPS.data(), LPL.data(), LPA.data(), LPPA.data(), LPTR.data(), T);
     
     if (borders.empty())
     {
         std::cerr << "[ERROR] segmentation failed - borders are empty!";
+        
         // always clean up before return
         delete[] LPS;
         delete[] LPL;
@@ -137,9 +137,7 @@ int main()
         return 1;
     }
 
-    // cout.setf(ios::unitbuf);
-
-    cout << borders << endl;
+    std::cout << borders << std::endl; 
 
     // check the state of stdout after attempt to write
     /*
