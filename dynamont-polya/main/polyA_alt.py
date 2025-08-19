@@ -21,7 +21,7 @@ def setup_working_directory():
     else : 
         pass
     
-#---------------- SEGMENTATION SECTION -----------------        
+#! ---------------- SEGMENTATION SECTION -----------------        
 
 def find_polya(task_queue: mp.Queue, result_queue: mp.Queue, input_path: str): 
     

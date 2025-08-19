@@ -20,6 +20,7 @@ time python polyA.py \
 
 
 
+
 # -s /home/hi68ren/Dokumente/dynamont-fork/dynamont/dynamont-polya/input_data/sequencing_summary_0.txt 
 # last errorless try - run time: 
 # TODO: monitor memory usage ! 

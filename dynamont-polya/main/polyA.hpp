@@ -245,7 +245,6 @@ inline void logB(double* sig, double* S, double* L, double* A, double* PA, doubl
         );
 
         TR[t] = log_emission_step(TR[t + 1], log_gumbel_r_transcript, next_sig, tr2);
-
     }
 }
 
@@ -284,7 +283,16 @@ struct Viterbi {
 
     Viterbi(const double* s, const double* l, const double* a, const double* pa, const double* tr,
             const double* lps, const double* lpl, const double* lpa, const double* lppa, const double* lptr)
-        : S(s), L(l), A(a), PA(pa), TR(tr), LPS(lps), LPL(lpl), LPA(lpa), LPPA(lppa), LPTR(lptr) {}
+        : S(s), L(l), A(a), PA(pa), TR(tr), LPS(lps), LPL(lpl), LPA(lpa), LPPA(lppa), LPTR(lptr) {} 
+
+        // initialization list with initializer (:) to initilize the fields with parameterized ctor 
+        /* 
+        * alternative :     
+        * Viterbi() {
+        S = s; 
+        L = l; 
+        }; 
+        */
 };
 
 
@@ -460,9 +468,7 @@ inline void funcTR(const size_t t, const Viterbi& data,
     }  
 }
 
-
-
-//! OUTPUT AREA
+//! ---------- OUTPUT AREA ----------
 
 inline std::string getBorders(const double* LPS, const double* LPL, 
                         const double* LPA, const double* LPPA, const double* LPTR, 

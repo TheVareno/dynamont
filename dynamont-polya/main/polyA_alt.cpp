@@ -27,7 +27,7 @@ inline constexpr double EPSILON = 1e-5; // chose by eye just to distinguish real
 static_assert(numeric_limits<double>::is_iec559, "IEEE 754 required");
 
 
-//! ------------------------------------------ PDFs, Forward, Backward & Posterior Probability ----------------------------------------------
+//! --------- PDFs, Forward, Backward & Posterior Probability ----------
 
 /** 
  * DIST & PARAM IN -> 60 READS : 
@@ -71,7 +71,8 @@ double log_gumbel_l_pdf(const double sig_val, const double loc, const double sca
 
 
 /**
- * logarithm gumbel right skewed PDF : checked with scipy.stats.gumbel_r, ->  //! around 0.92 different with scipy.stat.gumbel_r
+ * logarithm gumbel right skewed PDF : checked with scipy.stats.gumbel_r, ->  
+ * around 0.92 different with scipy.stat.gumbel_r
  */
 double log_gumbel_r_pdf(const double sig_val, const double loc, const double scale)
 {
@@ -190,7 +191,7 @@ double* logP(const double* F, const double* B, const double Z, const size_t T) {
 }
 
 
-//! --------------------------------------------------------- BACKTRACING SECTION ------------------------------------------------------
+//! --------- BACKTRACING SECTION ------------
 
 /**
  * define backtracing function after each state 

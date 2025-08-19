@@ -24,7 +24,6 @@
 /**
  * Gets the signal Value from python script
 */ 
-
 int main()
 {
     std::cout << fixed << showpoint;
@@ -70,7 +69,7 @@ int main()
 
     // so far we have the signal as an array of double values in //: sig
     // initialize Forward Backward algorithm calculation
-    double* forS = new double[T];
+    double* forS = new double[T];   
     double* forL = new double[T];
     double* forA = new double[T];
     double* forPA = new double[T];
@@ -81,6 +80,7 @@ int main()
     double* backPA = new double[T];
     double* backTR = new double[T];
 
+    // minimum value for probability of all reads
     for (size_t t = 0; t < T; ++t)
     {
         forS[t] = -INFINITY;
@@ -100,6 +100,7 @@ int main()
     
     // calculate segmentation probabilities, fill backward matrices
     logB(sig, backS, backL, backA, backPA, backTR, T, s, l1, l2, a1, a2, pa1, pa2, tr1, tr2);
+    
     // where both values should meet each other
     const double Zf = forTR[T - 1]; // end of trancript for Forward
     const double Zb = backS[0];     // is same as beginning of start for Backward
