@@ -265,7 +265,6 @@ inline std::vector<double> logP(const double* F, const double* B, const double Z
 } 
 
 // ========= BACKTRACKING ===========
-
 /**
  * define backtracing function after each state
 */
@@ -520,19 +519,19 @@ inline std::string getBorders(const double* LPS, const double* LPL,
 }
 
 
-template <typename T>
-inline bool writeBorders(const std::string& save_file, const std::string& read_id, const vector<T>& borders)
+inline bool writeBorders(const std::string& save_file, const std::string& read_id, 
+                        const std::vector<std::string>& borders)
 {
     if (borders.empty()) {
         std::cerr << "[WARN] Empty borders vector for read_id: " << read_id << std::endl;
         return false;
     }
 
-    // buil string in memery fist ! 
+    // buil a stream of string in memory fist! [optmzd] 
     std::ostringstream oss; 
     oss << read_id; 
 
-    for (const auto& border : borders) {  // Range-based for loop
+    for (const auto& border : borders) {
         oss << "," << border;
     }
     oss << "\n";    

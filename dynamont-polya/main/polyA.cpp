@@ -21,9 +21,7 @@
 #include "polyA.hpp" 
 
 
-/**
- * Gets the signal Value from python script
-*/ 
+// Gets the signal Value from python script
 int main()
 {
     std::cout << fixed << showpoint;
@@ -50,9 +48,8 @@ int main()
         return 1; 
     }
 
-    // PROCESS SIGNAL : convert string to double array
-    // How many signal values are there ?  T values
-    const size_t T = std::count(signal_values.begin(), signal_values.end(), ',') + 2; // len(sig) + 1
+    // PROCESS SIGNAL : convert string to double array - len(sig) + 1
+    const std::size_t T = std::count(signal_values.begin(), signal_values.end(), ',') + 2; 
 
     // init a double array of T-1 elements for signal values
     double* sig = new double[T - 1];
@@ -60,15 +57,15 @@ int main()
     // put each signal value in i-position of sig
     std::string value;
     std::stringstream ss(signal_values);
+    
+    // signal as an array of double+ values in sig v variable
     int i = 0;
-
     while (std::getline(ss, value, ','))
     {
         sig[i++] = std::stod(value);
     }
 
-    // so far we have the signal as an array of double values in //: sig
-    // initialize Forward Backward algorithm calculation
+    // initialize Forward - Backward algorithm fg 
     double* forS = new double[T];   
     double* forL = new double[T];
     double* forA = new double[T];
