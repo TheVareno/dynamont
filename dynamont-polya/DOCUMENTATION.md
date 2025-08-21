@@ -60,7 +60,7 @@ With the start and end of the poly(A) region identified, the next step was to de
   - `output_test.csv` → output of read id, poly(A) borders with estimated length for each given read id in CSV format    
 
 - **main/**  
-  - `argparse.hpp` → containing script to parse aguments  
+  - `argparse.hpp` → header file for parsing command-line arguments, providing a clean interface to handle user inputs and options
   - `bam_analysis.py` → analysis of basecaller output in bam format for poly(A) length estimation  
   - `polyA.cpp` → compute the forward and backward alogortihm, also trains Hidden Markov Model using Baum–Welch algorithm  
   - `polyA.hpp` → the header file main computation, containing all the functions needed for segmentation and traning the model    
@@ -92,8 +92,6 @@ python polyA.py \
 
 The estimation of poly(A) tail length is based on the predicted start and end coordinates of the poly(A) region in the raw signal. The key intuition is that the poly(A) tail corresponds to a continuous stretch of signal values, and its nucleotide length can be inferred by normalizing the signal length with the average sampling rate per nucleotide.
 
----
-
 ## Step 1: Poly(A) Signal Span
 
 Let:
@@ -114,28 +112,51 @@ Let:
 
 Then:
 
-$$\text{samples\_per\_nt} = \frac{L_{\text{signal}}^{\text{transcript}}}{L_{\text{nt}}^{\text{transcript}}}$$
+$$\text{samples per nt} = \frac{L_{\text{signal}}^{\text{transcript}}}{L_{\text{nt}}^{\text{transcript}}}$$
 
 ## Step 3: Estimate Poly(A) Tail Length in Nucleotides
 
 Finally, the estimated poly(A) tail length is given by:
 
-$$L_{\text{nt}}^{\text{poly(A)}} = \frac{L_{\text{signal}}^{\text{poly(A)}}}{\text{samples\_per\_nt}}$$
-
----
+$$L_{\text{nt}}^{\text{poly(A)}} = \frac{L_{\text{signal}}^{\text{poly(A)}}}{\text{samples per nt}}$$
 
 ### Summary
 
-This method provides a straightforward approach to estimate poly(A) tail length by:
 1. Identifying the signal span of the poly(A) region
 2. Calculating the average signal sampling rate per nucleotide
 3. Normalizing the poly(A) signal length by the sampling rate
 
 The resulting estimate $L_{\text{nt}}^{\text{poly(A)}}$ represents the poly(A) tail length in nucleotides.
 
-## Benchmark Dastaset  
+--- 
+ 
+## Benchmark Dataset  
 
+For evaluation of the poly(A) length estimation, the benchmark dataset can be used which is described in the preprint study:  
+- **Preprint link**: [https://www.biorxiv.org/content/10.1101/2024.10.25.620206v1.full.pdf]  
+- **Dataset link**: [https://doi.org/10.5524/102736]
+- **Reference of Sequins** [https://github.com/abcdtree/Sequins_QC/tree/main/ref]
 
+To obtain access to the raw data, the corresponding author of the study was contacted directly, and the dataset was kindly shared for benchmarking purposes.  
+
+In this study, the poly(A) tail estimation was benchmarked among 4 exsiting tools: 
+ - Tailfindr (mathematical approach to preprocess the signal data)
+ - Nanopolish polya (HMM based approach)
+ - Dorado polya-estimation (deep learning based approach)
+ - BoostNano (deep learning based approach)
+   
+The link above contains all the FAST5 data of spiked-in RNA and CSV performances, outputed by each tool 4 tools.  
+
+### Dataset Description  
+
+The benchmark data consists of *in vitro* transcribed (IVT) RNA molecules with controlled poly(A) tails of known lengths. The poly(A) tails were designed in two groups:  
+
+- **Short poly(A) group**: fixed tail length of ~30 nucleotides  
+- **Long poly(A) group**: fixed tail length of ~60 nucleotides  
+
+The dataset contains nanopore direct RNA sequencing reads from these spiked RNA molecules, providing a **gold standard** for evaluating poly(A) identification and length estimation.  
+
+This design allows a direct comparison between predicted poly(A) lengths from the algorithm and the known ground truth lengths, making it an ideal dataset for benchmarking.
 
 --- 
 
@@ -153,8 +174,19 @@ It contains the poly(A) start and end positions within the raw signal, along wit
 
 --- 
 
+## Details on latest Performance (updated on 21.08.2025) 
+
+
+--- 
+
 ## Other References  
 
+- **BoostNano** repository [https://github.com/haotianteng/BoostNano]
+- **Nanopolish** repository [https://github.com/jts/nanopolish]
+- **Review** study[https://pubmed.ncbi.nlm.nih.gov/35769001] for measuring poly(A) tail length  
+- **Nanopolish**[https://www.nature.com/articles/s41592-019-0617-2?fromPaywallRec=false#Sec12] orginal study
+- **TailfindR**[https://pmc.ncbi.nlm.nih.gov/articles/PMC6800471/#s05] orginal study
+- **Dorado**[https://github.com/nanoporetech/dorado/blob/release-v1.0/documentation/PolyTailConfig.md] bam data description
 
 
 
