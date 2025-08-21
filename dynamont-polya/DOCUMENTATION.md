@@ -88,46 +88,53 @@ python polyA.py \
 ```
 ---
 
-## Poly(A) Tail Length Estimation
+# Poly(A) Tail Length Estimation
 
-The estimation of poly(A) tail length is based on the predicted start and end coordinates of the poly(A) region in the raw signal.
-
-The key intuition is that the poly(A) tail corresponds to a continuous stretch of signal values, and its nucleotide length can be inferred by normalizing the signal length with the average sampling rate per nucleotide.
+The estimation of poly(A) tail length is based on the predicted start and end coordinates of the poly(A) region in the raw signal. The key intuition is that the poly(A) tail corresponds to a continuous stretch of signal values, and its nucleotide length can be inferred by normalizing the signal length with the average sampling rate per nucleotide.
 
 ---
 
-### Step 1: Poly(A) signal span
+## Step 1: Poly(A) Signal Span
 
-Let
+Let:
 - $s_{\text{start}}$ = predicted start coordinate of the poly(A) region in the raw signal
 - $s_{\text{end}}$ = predicted end coordinate of the poly(A) region in the raw signal
 
 The number of raw signal samples corresponding to the poly(A) region is:
 
-$$
-L_{\text{signal}}^{\text{poly(A)}} = s_{\text{end}} - s_{\text{start}}
-$$
+$$L_{\text{signal}}^{\text{poly(A)}} = s_{\text{end}} - s_{\text{start}}$$
 
-### Step 2: Average samples per nucleotide
+## Step 2: Average Samples per Nucleotide
 
 For each transcript, we calculate the average number of signal samples per nucleotide.
 
-Let
+Let:
 - $L_{\text{signal}}^{\text{transcript}}$ = total number of signal samples aligned to the transcript
 - $L_{\text{nt}}^{\text{transcript}}$ = transcript length in nucleotides (obtained from the BAM file output by Dorado)
 
 Then:
 
-$\text{samples\_per\_nt} = \frac{L_{\text{signal}}^{\text{transcript}}}{L_{\text{nt}}^{\text{transcript}}}$
+$$\text{samples\_per\_nt} = \frac{L_{\text{signal}}^{\text{transcript}}}{L_{\text{nt}}^{\text{transcript}}}$$
 
-### Step 3: Estimate poly(A) tail length in nucleotides
+## Step 3: Estimate Poly(A) Tail Length in Nucleotides
 
 Finally, the estimated poly(A) tail length is given by:
 
-$L_{\text{nt}}^{\text{poly(A)}} = \frac{L_{\text{signal}}^{\text{poly(A)}}}{\text{samples\_per\_nt}}$
+$$L_{\text{nt}}^{\text{poly(A)}} = \frac{L_{\text{signal}}^{\text{poly(A)}}}{\text{samples\_per\_nt}}$$
 
+---
+
+### Summary
+
+This method provides a straightforward approach to estimate poly(A) tail length by:
+1. Identifying the signal span of the poly(A) region
+2. Calculating the average signal sampling rate per nucleotide
+3. Normalizing the poly(A) signal length by the sampling rate
+
+The resulting estimate $L_{\text{nt}}^{\text{poly(A)}}$ represents the poly(A) tail length in nucleotides.
 
 ## Benchmark Dastaset  
+
 
 
 --- 
@@ -147,6 +154,7 @@ It contains the poly(A) start and end positions within the raw signal, along wit
 --- 
 
 ## Other References  
+
 
 
 
