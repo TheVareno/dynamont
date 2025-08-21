@@ -36,48 +36,79 @@ With the start and end of the poly(A) region identified, the next step was to de
 
 --- 
 
-## Repository Structure  
+## Repository Structure (Directory and File Overview)  
 
-### Directory and File Overview  
+ in Branch: dynamont/polyA -> under the dirrectiory of **/dynamont-polya**:    
 
-- **data/**  
-  - `example_reads.fast5` → example input file  
-  - `annotations.csv` → manually annotated regions  
 
-- **scripts/**  
-  - `extract_regions.py` → extracts signal values for each annotated region  
-  - `fit_pdfs.py` → fits probability density functions (PDFs) to signal data  
-  - `train_hmm.py` → trains Hidden Markov Model using Baum–Welch algorithm  
-  - `segment_signal.py` → applies trained HMM to segment new reads  
-  - `estimate_polya.py` → estimates poly(A) tail length based on segmentation  
+- **build_model_pipeline/**  
+  - **model_building_files/** → log probabilities/ trained parameters saved during model building   
+  - `annotate_signal.py` → scirpts for manuall annotation of raw signal data     
+  - `coordinations_analysis.py` →  visaulization of Nanopolish and TailfindR performance  
+  - `model_performance_comparison.py` → comparison of HMM model performance  
+  - `pdf_estimation.py` → fitt and estimate PDF for each region  
+  - `pysam_utils.py` → using pysam to extract data from Basecaller (Dorado) output
+  - `run_commands.sh` → run the script with given parameter
+  - `tail_findr.R` → rund tailfindr package in R script
 
-- **results/**  
-  - `fitted_pdfs/` → saved PDFs for each region  
-  - `hmm_params.json` → trained transition and emission probabilities  
-  - `segmentation_plots/` → visualizations of HMM segmentation  
 
+- **input_data/**  
+  - `reads.fast5` → example input file  
+  - `sequencing_summary_0.txt` → summary of experiment (potential usage for length estimation)   
+
+- **output_data/**  
+  - `output_test.csv` → output of read id, poly(A) borders with estimated length for each given read id in CSV format    
+
+- **main/**  
+  - `argparse.hpp` → containing script to parse aguments  
+  - `bam_analysis.py` → analysis of basecaller output in bam format for poly(A) length estimation  
+  - `polyA.cpp` → compute the forward and backward alogortihm, also trains Hidden Markov Model using Baum–Welch algorithm  
+  - `polyA.hpp` → the header file main computation, containing all the functions needed for segmentation and traning the model    
+  - `polyA.py` → reads the given fast5 / pod5 / slow5 input read, send signal data to polyA.cpp using stdout    
+  - `polyA.sh` → runs the polyA.py with all given arguments 
+  - `utils.cpp` → contains function helping forward backward calculations  
+  - `utils.hpp` → the header file   
+  - `polyA` → the binary file of compiled version of polyA.cpp   
+
+- `requirements.txt` → required packages to install   
+- `DOCUMENTATION.md` → containing all the structures    
+ 
 ---
 
 ## Usage  
 
-1. **Preprocess data**  
-   ```bash
-   python scripts/extract_regions.py --input data/example_reads.fast5
+The algorithm can be executed via the main script **`polyA.py`**.  
+The following parameters must be provided:  
 
---- 
-
+```bash
+python polyA.py \
+  --input_dir <PATH_TO_INPUT_DIRECTORY> \
+  --output_dir <PATH_TO_OUTPUT_DIRECTORY> \
+  --bam_file <PATH_TO_BAM_FILE>
 
 ---
 
 ## Mathematical Concepts 
 
+
 --- 
 
-## Output 
+## Output
+
+The output is a tabular file where each row corresponds to a single read from the input dataset.  
+It contains the poly(A) start and end positions within the raw signal, along with the estimated poly(A) tail length.  
+
+| Read ID        | Poly(A) Start | Poly(A) End | Estimated Poly(A) Length |
+|----------------|---------------|-------------|--------------------------|
+| read_00123abc  | 1050          | 1450        | 400                      |
+
+*Table 1: Example output row. In practice, the output table will typically contain thousands of rows (e.g., ~4000 rows for a dataset of 4000 FAST5 reads).*  
+
 
 --- 
 
 ##  
+
 
 
 
