@@ -85,10 +85,51 @@ python polyA.py \
   --input_dir <PATH_TO_INPUT_DIRECTORY> \
   --output_dir <PATH_TO_OUTPUT_DIRECTORY> \
   --bam_file <PATH_TO_BAM_FILE>
-
+```
 ---
 
-## Mathematical Concepts 
+## Length Estimation 
+
+## Poly(A) Tail Length Estimation  
+
+The estimation of poly(A) tail length is based on the predicted start and end coordinates of the poly(A) region in the raw signal.  
+The key intuition is that the poly(A) tail corresponds to a continuous stretch of signal values, and its nucleotide length can be inferred by normalizing the signal length with the average sampling rate per nucleotide.  
+
+### Step 1: Poly(A) signal span  
+Let  
+- \( s_{\text{start}} \) = predicted start coordinate of the poly(A) region in the raw signal  
+- \( s_{\text{end}} \) = predicted end coordinate of the poly(A) region in the raw signal  
+
+The number of raw signal samples corresponding to the poly(A) region is:  
+
+\[
+L_{\text{signal}}^{\text{poly(A)}} = s_{\text{end}} - s_{\text{start}}
+\]  
+
+### Step 2: Average samples per nucleotide  
+For each transcript, we calculate the average number of signal samples per nucleotide.  
+Let  
+- \( L_{\text{signal}}^{\text{transcript}} \) = total number of signal samples aligned to the transcript  
+- \( L_{\text{nt}}^{\text{transcript}} \) = transcript length in nucleotides (obtained from the BAM file output by Dorado)  
+
+Then:  
+
+\[
+\text{samples\_per\_nt} = \frac{L_{\text{signal}}^{\text{transcript}}}{L_{\text{nt}}^{\text{transcript}}}
+\]  
+
+### Step 3: Estimate poly(A) tail length in nucleotides  
+Finally, the estimated poly(A) tail length is given by:  
+
+\[
+L_{\text{nt}}^{\text{poly(A)}} = \frac{L_{\text{signal}}^{\text{poly(A)}}}{\text{samples\_per\_nt}}
+\]  
+
+This formula ensures that the length of the poly(A) tail is corrected for differences in sampling rate across different reads.
+
+
+
+## Benchmark Dastaset 
 
 
 --- 
@@ -102,12 +143,13 @@ It contains the poly(A) start and end positions within the raw signal, along wit
 |----------------|---------------|-------------|--------------------------|
 | read_00123abc  | 1050          | 1450        | 400                      |
 
-*Table 1: Example output row. In practice, the output table will typically contain thousands of rows (e.g., ~4000 rows for a dataset of 4000 FAST5 reads).*  
+*Example output row. In practice, the output table will typically contain thousands of rows (e.g., ~4000 rows for a dataset of 4000 FAST5 reads).*  
 
 
 --- 
 
-##  
+## Other References  
+
 
 
 
