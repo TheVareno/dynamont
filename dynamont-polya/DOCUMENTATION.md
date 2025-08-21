@@ -108,8 +108,6 @@ $$
 L_{\text{signal}}^{\text{poly(A)}} = s_{\text{end}} - s_{\text{start}}
 $$
 
----
-
 ### Step 2: Average samples per nucleotide
 
 For each transcript, we calculate the average number of signal samples per nucleotide.
@@ -124,8 +122,6 @@ $$
 \text{samples\_per\_nt} = \frac{L_{\text{signal}}^{\text{transcript}}}{L_{\text{nt}}^{\text{transcript}}}
 $$
 
----
-
 ### Step 3: Estimate poly(A) tail length in nucleotides
 
 Finally, the estimated poly(A) tail length is given by:
@@ -134,9 +130,8 @@ $$
 L_{\text{nt}}^{\text{poly(A)}} = \frac{L_{\text{signal}}^{\text{poly(A)}}}{\text{samples\_per\_nt}}
 $$
 
-This formula ensures that the length of the poly(A) tail is corrected for differences in sampling rate across different reads.
 
-## Benchmark Dastaset 
+## Benchmark Dastaset  
 
 
 --- 
@@ -156,6 +151,7 @@ It contains the poly(A) start and end positions within the raw signal, along wit
 --- 
 
 ## Other References  
+
 
 
 
