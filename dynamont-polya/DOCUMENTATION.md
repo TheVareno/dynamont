@@ -174,7 +174,62 @@ It contains the poly(A) start and end positions within the raw signal, along wit
 
 --- 
 
-## Details on latest Performance (updated on 21.08.2025) 
+## Details on latest Performance (updated on 25.08.2025) 
+
+- Syntax is correct - no typos, missing semicolons in both polyA header and main file.
+- Declarations match - functions/variables are properly declared
+- Types are compatible - no type mismatches
+- Includes work - header file is found and parsed correctly
+
+- Memory leakage checked with:
+  ```bash
+  g++ -g -fsanitize=address polyA.cpp -o polyA  
+  ```
+  **no memory leakage found!**  
+
+- Compile with more warning messages:  
+  ```bash
+  g++ -g -Wall -Wextra polyA.cpp -o polyA
+  ```
+  **just a few unsued variable: prevState in backtracking, Zb**
+  
+  
+
+### Approaches  
+
+Two approaches have been tested for optimizing the poly(A) length estimation pipeline:  
+
+#### **1. Split-based Approach (with `ont_fast_api`)**  
+
+- Uses the `Fast5Filter` class to **split input data** into smaller batches (`batch_size = 500`).  
+- Each batch is processed individually using the `run_polyA_finder()` function.  
+- Results are written to the CSV output file.  
+- **Current Status**:  
+  - The approach successfully processes data and produces output.  
+  - However, some reads fail with **error code `-11`** originating from the C++ backend.  
+  - A memory leakage check was performed, and **no leaks were detected**.
+  - **Last runtime details** :
+    - real	29m26.759s
+    - user	113m6.365s
+    - sys	0m25.899s
+    
+
+#### **2. Non-split Approach**  
+
+- Processes input data directly without splitting into batches.  
+- **Current Status**:  
+  - The program **stalls indefinitely** during execution.  
+  - The root cause of stalling has not yet been identified.  
+
+
+
+### Next Steps Considerations  
+
+- Investigate error code `-11` in the split-based approach (potentially related to specific read formats or corrupted files).  
+- Debug stalling behavior in the non-split approach (possible bottlenecks in `run_polyA_finder()` or handling of input streams).  
+- Compare runtime and accuracy between both approaches once stable.  
+
+
 
 
 --- 
@@ -187,8 +242,6 @@ It contains the poly(A) start and end positions within the raw signal, along wit
 - **Nanopolish**[https://www.nature.com/articles/s41592-019-0617-2?fromPaywallRec=false#Sec12] orginal study
 - **TailfindR**[https://pmc.ncbi.nlm.nih.gov/articles/PMC6800471/#s05] orginal study
 - **Dorado**[https://github.com/nanoporetech/dorado/blob/release-v1.0/documentation/PolyTailConfig.md] bam data description
-
-
 
 
 
